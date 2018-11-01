@@ -1,6 +1,6 @@
 # dque - A durable (persistent) queue
 
-dque is an embeddable persistent FIFO queue of like structs.  It uses no 3rd party libraries (except for testing).
+dque is an embeddable persistent FIFO queue for Golang.
 
 The queue is broken up into segments, each of which corresponds with a file on disk.
 
