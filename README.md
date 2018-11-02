@@ -46,10 +46,10 @@ func main() {
     }
 
     // You can reconsitute the queue from disk at any time
-	q, err = Open("item-queue", "/var", 50, ItemBuilder)
-	if err != nil {
-		log.Fatal("Error opening existing dque", err)
-	}
+    q, err = Open("item-queue", "/var", 50, ItemBuilder)
+    if err != nil {
+        log.Fatal("Error opening existing dque", err)
+    }
 
     // Dequeue an item and act on it
     var iface interface{}
