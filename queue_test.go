@@ -22,28 +22,26 @@ func item2Builder() interface{} {
 
 // Adds 1 and removes 1 in a loop to ensure that when we've filled
 // up the first segment that we delete it and move on to the next segment
-func Test_queue_AddRemoveLoop(t *testing.T) {
+func TestQueue_AddRemoveLoop(t *testing.T) {
 	qName := "test1"
 	if err := os.RemoveAll(qName); err != nil {
-		t.Error("Error removing queue directory", err)
+		t.Fatal("Error removing queue directory", err)
 	}
 
-	// Create a new segment with segment size of 3
-	q, err := New(qName, ".", 3, item2Builder)
-	if err != nil {
-		t.Error("Error creating new dque", err)
-	}
+	// Create a new queue with segment size of 3
+	var err error
+	q := newQ(t, qName)
 
 	for i := 0; i < 4; i++ {
 		var item interface{}
-		if err := q.Enqueue(item2{i}); err != nil {
-			t.Error("Error enqueueing", err)
+		if err := q.Enqueue(&item2{i}); err != nil {
+			t.Fatal("Error enqueueing", err)
 		}
 		item, err = q.Dequeue()
 		if err != nil {
-			t.Error("Error dequeueing", err)
+			t.Fatal("Error dequeueing", err)
 		}
-		fmt.Println("Dequeued:", item)
+		fmt.Printf("Dequeued %#v:", item)
 	}
 
 	// Assert that we have just one segment
@@ -52,11 +50,8 @@ func Test_queue_AddRemoveLoop(t *testing.T) {
 	// Assert that the first segment is #2
 	assert.Equal(t, 2, q.firstSegment.number, "The first segment is not 2")
 
-	// Now reopen the queue and check our assertions.
-	q, err = Open(qName, ".", 3, item2Builder)
-	if err != nil {
-		t.Error("Error creating new dque", err)
-	}
+	// Now reopen the queue and check our assertions again.
+	q = openQ(t, qName)
 
 	// Assert that we have just one segment
 	assert.Equal(t, q.firstSegment, q.lastSegment, "After opening, the first segment must match the second")
@@ -67,29 +62,27 @@ func Test_queue_AddRemoveLoop(t *testing.T) {
 
 // Adds 2 and removes 1 in a loop to ensure that when we've filled
 // up the first segment that we delete it and move on to the next segment
-func Test_queue_Add2Remove1(t *testing.T) {
+func TestQueue_Add2Remove1(t *testing.T) {
 	qName := "test1"
 	if err := os.RemoveAll(qName); err != nil {
-		t.Error("Error removing queue directory", err)
+		t.Fatal("Error removing queue directory", err)
 	}
 
-	// Create a new segment with segment size of 3
-	q, err := New(qName, ".", 3, item2Builder)
-	if err != nil {
-		t.Error("Error creating new dque", err)
-	}
+	// Create a new queue with segment size of 3
+	var err error
+	q := newQ(t, qName)
 
 	for i := 0; i < 4; i = i + 2 {
 		var item interface{}
-		if err := q.Enqueue(item2{i}); err != nil {
-			t.Error("Error enqueueing", err)
+		if err := q.Enqueue(&item2{i}); err != nil {
+			t.Fatal("Error enqueueing", err)
 		}
-		if err := q.Enqueue(item2{i + 1}); err != nil {
-			t.Error("Error enqueueing", err)
+		if err := q.Enqueue(&item2{i + 1}); err != nil {
+			t.Fatal("Error enqueueing", err)
 		}
 		item, err = q.Dequeue()
 		if err != nil {
-			t.Error("Error dequeueing", err)
+			t.Fatal("Error dequeueing", err)
 		}
 		fmt.Println("Dequeued:", item)
 	}
@@ -100,11 +93,8 @@ func Test_queue_Add2Remove1(t *testing.T) {
 	// Assert that the first segment is #2
 	assert.Equal(t, 2, q.lastSegment.number, "The last segment is not 2")
 
-	// Now reopen the queue and check our assertions.
-	q, err = Open(qName, ".", 3, item2Builder)
-	if err != nil {
-		t.Error("Error creating new dque", err)
-	}
+	// Now reopen the queue and check our assertions again.
+	q = openQ(t, qName)
 
 	// Assert that we have more than one segment
 	assert.NotEqual(t, q.firstSegment, q.lastSegment, "After opening, the first segment cannot match the second")
@@ -113,51 +103,94 @@ func Test_queue_Add2Remove1(t *testing.T) {
 	assert.Equal(t, 2, q.lastSegment.number, "After opening, the last segment is not 2")
 }
 
-// Adds 4 and removes 3
-func Test_queue_Add4Remove3(t *testing.T) {
+// Adds 7 and removes 6
+func TestQueue_Add7Remove6(t *testing.T) {
 	qName := "test1"
 	if err := os.RemoveAll(qName); err != nil {
-		t.Error("Error removing queue directory", err)
+		t.Fatal("Error removing queue directory", err)
 	}
 
-	// Create a new segment with segment size of 3
-	q, err := New(qName, ".", 3, item2Builder)
-	if err != nil {
-		t.Error("Error creating new dque", err)
-	}
+	// Create new queue with segment size 3
+	q := newQ(t, qName)
 
-	// Add 4 items
-	for i := 0; i < 4; i++ {
-		if err := q.Enqueue(item2{i}); err != nil {
-			t.Error("Error enqueueing", err)
+	// Enqueue 7 items
+	for i := 0; i < 7; i++ {
+		if err := q.Enqueue(&item2{i}); err != nil {
+			t.Fatal("Error enqueueing", err)
 		}
 	}
 
-	for i := 0; i < 3; i++ {
+	// Assert that the first segment is #3
+	assert.Equal(t, 1, q.firstSegment.number, "the first segment is not 1")
+
+	// Assert that the last segment is #3
+	assert.Equal(t, 3, q.lastSegment.number, "the last segment is not 3")
+
+	// Dequeue 6 items
+	for i := 0; i < 6; i++ {
 		iface, err := q.Dequeue()
 		if err != nil {
-			t.Error("Error dequeueing", err)
+			t.Fatal("Error dequeueing", err)
 		}
 		item, ok := iface.(item2)
-		assert.True(t, ok, "Dequeued object is not of type item2")
-		assert.Equal(t, i, item.Id, "Unexpected itemId")
+		if ok {
+			fmt.Printf("Dequeued %T %t %#v\n", item, ok, item)
+			assert.Equal(t, i, item.Id, "Unexpected itemId")
+		} else {
+			item, ok := iface.(*item2)
+			assert.True(t, ok, "Dequeued object is not of type *item2")
+			assert.Equal(t, i, item.Id, "Unexpected itemId")
+		}
 	}
 
-	// Assert that we have more than one segment
+	// Assert that we have only one segment
 	assert.Equal(t, q.firstSegment, q.lastSegment, "The first segment must match the second")
 
-	// Assert that the first segment is #2
-	assert.Equal(t, 2, q.lastSegment.number, "The last segment is not 2")
+	// Assert that the first segment is #3
+	assert.Equal(t, 3, q.firstSegment.number, "The last segment is not 3")
 
-	// Now reopen the queue and check our assertions.
-	q, err = Open(qName, ".", 3, item2Builder)
-	if err != nil {
-		t.Error("Error creating new dque", err)
-	}
+	// Now reopen the queue and check our assertions again.
+	q = openQ(t, qName)
 
 	// Assert that we have more than one segment
 	assert.Equal(t, q.firstSegment, q.lastSegment, "After opening, the first segment must match the second")
 
-	// Assert that the first segment is #2
-	assert.Equal(t, 2, q.lastSegment.number, "After opening, the last segment is not 2")
+	// Assert that the last segment is #3
+	assert.Equal(t, 3, q.lastSegment.number, "After opening, the last segment is not 3")
+}
+
+func TestQueue_EmptyDequeue(t *testing.T) {
+	qName := "test1"
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory", err)
+	}
+
+	// Create new queue with segment size 3
+	q := newQ(t, qName)
+
+	item, err := q.Dequeue()
+	if err != nil {
+		t.Fatal("Error dequeueing", err)
+	}
+	if item != nil {
+		t.Fatal("Expected nil if queue is empty")
+	}
+}
+
+func newQ(t *testing.T, qName string) *Queue {
+	// Create a new segment with segment size of 3
+	q, err := New(qName, ".", 3, item2Builder)
+	if err != nil {
+		t.Fatal("Error creating new dque", err)
+	}
+	return q
+}
+
+func openQ(t *testing.T, qName string) *Queue {
+	// Open an existing segment with segment size of 3
+	q, err := Open(qName, ".", 3, item2Builder)
+	if err != nil {
+		t.Fatal("Error opening dque", err)
+	}
+	return q
 }

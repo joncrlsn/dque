@@ -49,6 +49,8 @@ func (seg *qSegment) load() error {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
+	fmt.Printf("TEMP: Loading segment %d\n", seg.number)
+
 	// Open the file in read mode
 	file, err := os.OpenFile(seg.filePath(), os.O_RDONLY, 0644)
 	if err != nil {
@@ -80,7 +82,7 @@ func (seg *qSegment) load() error {
 		if gobLen == 0 {
 			// Remove the first item from the in-memory queue
 			seg.objects = seg.objects[1:]
-			fmt.Println("TEMP: Detected delete")
+			fmt.Println("TEMP: Detected delete in load()")
 			seg.removeCount++
 			continue
 		}
@@ -120,6 +122,8 @@ func (seg *qSegment) remove() (interface{}, error) {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
+	fmt.Printf("TEMP: Removing from segment %d size %d removed %d\n", seg.number, len(seg.objects), seg.removeCount)
+
 	if len(seg.objects) == 0 {
 		// Queue is empty so return nil object (and empty_segment error)
 		return nil, emptySegment
@@ -149,8 +153,7 @@ func (seg *qSegment) remove() (interface{}, error) {
 	// Increment the delete count
 	seg.removeCount++
 
-	// Brag about it
-	fmt.Printf("TEMP: Removed: %#v\n", object)
+	fmt.Printf("TEMP: Removed from segment %d %#v\n", seg.number, object)
 
 	return object, nil
 }
@@ -161,6 +164,8 @@ func (seg *qSegment) add(object interface{}) error {
 	// This is heavy-handed but its safe
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
+
+	fmt.Printf("TEMP: Adding to segment %d %#v size %d removed %d\n", seg.number, object, len(seg.objects), seg.removeCount)
 
 	// Encode the struct to a byte buffer
 	var buff bytes.Buffer

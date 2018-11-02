@@ -22,7 +22,7 @@ package main
 //
 
 import (
-	"fmt"
+	//"fmt"
 	"strconv"
 	"sync"
 
@@ -64,21 +64,21 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 
 	// Validation
 	if len(name) == 0 {
-		return nil, errors.New("The queue name requires a value.")
+		return nil, errors.New("the queue name requires a value.")
 	}
 	if len(dirPath) == 0 {
-		return nil, errors.New("The queue directory requires a value.")
+		return nil, errors.New("the queue directory requires a value.")
 	}
 	if !dirExists(dirPath) {
-		return nil, errors.New("The given queue directory is not valid: " + dirPath)
+		return nil, errors.New("the given queue directory is not valid: " + dirPath)
 	}
 	fullPath := path.Join(dirPath, name)
 	if dirExists(fullPath) {
-		return nil, errors.New("The given queue directory already exists: " + fullPath + ". Use Open instead")
+		return nil, errors.New("the given queue directory already exists: " + fullPath + ". Use Open instead")
 	}
 
 	if err := os.Mkdir(fullPath, 0755); err != nil {
-		return nil, errors.Wrap(err, "Error creating queue directory "+fullPath)
+		return nil, errors.Wrap(err, "error creating queue directory "+fullPath)
 	}
 
 	q := Queue{Name: name, DirPath: dirPath}
@@ -94,17 +94,17 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 
 	// Validation
 	if len(name) == 0 {
-		return nil, errors.New("The queue name requires a value.")
+		return nil, errors.New("the queue name requires a value.")
 	}
 	if len(dirPath) == 0 {
-		return nil, errors.New("The queue directory requires a value.")
+		return nil, errors.New("the queue directory requires a value.")
 	}
 	if !dirExists(dirPath) {
-		return nil, errors.New("The given queue directory is not valid (" + dirPath + ")")
+		return nil, errors.New("the given queue directory is not valid (" + dirPath + ")")
 	}
 	fullPath := path.Join(dirPath, name)
 	if !dirExists(fullPath) {
-		return nil, errors.New("The given queue does not exist (" + fullPath + ")")
+		return nil, errors.New("the given queue does not exist (" + fullPath + ")")
 	}
 
 	q := Queue{Name: name, DirPath: dirPath}
@@ -129,24 +129,24 @@ func (q *Queue) Enqueue(obj interface{}) error {
 	if len(q.firstSegment.dirPath) == 0 {
 		// We need to load our state from disk
 		if err := q.load(); err != nil {
-			return errors.Wrap(err, "Error loading the queue: "+q.Name)
+			return errors.Wrap(err, "error loading the queue: "+q.Name)
 		}
 	}
 
 	// Add the object to the last segment
 	if err := q.lastSegment.add(obj); err != nil {
-		return errors.Wrap(err, "Error adding item to the last segment")
+		return errors.Wrap(err, "error adding item to the last segment")
 	}
 
-	fmt.Println("Enqueing first segment size: ", q.firstSegment.size())
-	fmt.Println("Enqueing last segment size: ", q.lastSegment.size())
+	//fmt.Println("Enqueing first segment size: ", q.firstSegment.size())
+	//fmt.Println("Enqueing last segment size: ", q.lastSegment.size())
 
 	// If this segment is full then create a new one
 	if q.lastSegment.bigness() >= q.Config.ItemsPerSegment {
 		// We have filled our last segment to capacity, so create a new one
 		seg, err := newQueueSegment(q.fullPath, q.lastSegment.number+1, q.builder)
 		if err != nil {
-			return errors.Wrap(err, "Error creating new queue segment: "+strconv.Itoa(q.lastSegment.number+1))
+			return errors.Wrap(err, "error creating new queue segment: "+strconv.Itoa(q.lastSegment.number+1))
 		}
 		q.lastSegment = seg
 	}
@@ -155,6 +155,7 @@ func (q *Queue) Enqueue(obj interface{}) error {
 }
 
 // Dequeue removes and returns the first item in the queue.
+// If the queue is empty, nil is returned
 func (q *Queue) Dequeue() (interface{}, error) {
 
 	// This is heavy-handed but its safe
@@ -170,53 +171,50 @@ func (q *Queue) Dequeue() (interface{}, error) {
 
 	// Remove the first object from the first segment
 	obj, err := q.firstSegment.remove()
+	if err == emptySegment {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "error removing item from the first segment")
 	}
 
 	// If this segment is empty and we've reached the max for this segment
 	// then delete the file and open the next one
-	if q.firstSegment.size() == 0 {
-		if q.firstSegment.bigness() == q.Config.ItemsPerSegment {
+	if q.firstSegment.size() == 0 &&
+		q.firstSegment.bigness() >= q.Config.ItemsPerSegment {
 
-			// We have only one segment and it's now empty so destroy it
-			// and create a new one
-			if q.firstSegment.number == q.lastSegment.number {
+		// Delete the file on disk
+		if err := q.firstSegment.delete(); err != nil {
+			return obj, errors.Wrap(err, "error deleting queue segment "+q.firstSegment.filePath()+". Queue is in an inconsistent state")
+		}
 
-				// Delete the file on disk
-				if err := q.firstSegment.delete(); err != nil {
-					return obj, errors.Wrap(err, "error deleting queue segment "+q.firstSegment.filePath()+". Queue is in an inconsistent state")
-				}
+		// We have only one segment and it's now empty so destroy it
+		// and create a new one
+		if q.firstSegment.number == q.lastSegment.number {
 
-				// Create the next segment
-				seg, err := newQueueSegment(q.fullPath, q.firstSegment.number+1, q.builder)
+			// Create the next segment
+			seg, err := newQueueSegment(q.fullPath, q.firstSegment.number+1, q.builder)
+			if err != nil {
+				return obj, errors.Wrap(err, "error creating new segment. Queue is in an inconsistent state")
+			}
+			q.firstSegment = seg
+			q.lastSegment = seg
+
+		} else {
+
+			if q.firstSegment.number+1 == q.lastSegment.number {
+				// We are down to a 1 segment queue
+				q.firstSegment = q.lastSegment
+			} else {
+
+				// Open the next segment
+				seg, err := openQueueSegment(q.fullPath, q.firstSegment.number+1, q.builder)
 				if err != nil {
 					return obj, errors.Wrap(err, "error creating new segment. Queue is in an inconsistent state")
 				}
 				q.firstSegment = seg
-				q.lastSegment = seg
-
-			} else {
-
-				// Delete the file on disk
-				if err := q.firstSegment.delete(); err != nil {
-					return obj, errors.Wrap(err, "error deleting queue segment "+q.firstSegment.filePath()+". Queue is in an inconsistent state")
-				}
-
-				if q.firstSegment.number+1 == q.lastSegment.number {
-					// We are down to a 1 segment queue
-					q.firstSegment = q.lastSegment
-				} else {
-
-					// Open the next segment
-					seg, err := openQueueSegment(q.fullPath, q.firstSegment.number+1, q.builder)
-					if err != nil {
-						return obj, errors.Wrap(err, "error creating new segment. Queue is in an inconsistent state")
-					}
-					q.firstSegment = seg
-				}
-
 			}
+
 		}
 	}
 
