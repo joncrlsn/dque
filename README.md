@@ -1,8 +1,10 @@
 # dque - durable (persistent) queue
 
-dque is an embedded persistent FIFO queue for Go.  It frustrated me that the only persistent queues for Go were just wrappers around LevelDB, so I wrote this.  While I like the approach, I hope that Golang generics will someday make it easier to use.  I rather hope that someone will fork this and build a real, supported project out of it.  I wrote this as an example of how a persistent FIFO queue should work (IMHO) and I'd love to see someone else take it and make it "fly".  
+dque is an embedded persistent FIFO queue for Go.  It frustrated me that the only persistent queues for Go were just wrappers around LevelDB, so I wrote this.  While I like the approach, I hope that Golang generics will someday make it easier to use.  
 
-This seems to work, but I'm still testing it and creating a benchmark for it to see how it performs. 
+I rather hope that someone will fork this and build a real, supported project out of it.  I wrote this as an example of how a persistent FIFO queue should work (IMHO) and I'd love to see someone else take it and make it "fly".  
+
+The current code seems to work, but I'm still writing tests and creating a benchmark for it to see how it performs. 
 
 ### Implementation
 * The queue is held in segments of a configurable size. Each segment corresponds with a file on disk. If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.
@@ -18,7 +20,7 @@ This seems to work, but I'm still testing it and creating a benchmark for it to 
   * When each item in the segment has been dequeued, the segment file is deleted and the next segment is loaded into memory.
 
 ### Example
-```
+```golang
 // Item is the thing we'll be storing in the queue
 type Item struct {
     Name string
@@ -33,10 +35,10 @@ func ItemBuilder() interface{} {
 
 func main() {
    	// Create a new queue with segment size of 50
-	q, err := New("item-queue", "/var", 50, ItemBuilder)
-	if err != nil {
-		log.Fatal("Error creating new dque", err)
-	}
+    q, err := New("item-queue", "/var", 50, ItemBuilder)
+    if err != nil {
+        log.Fatal("Error creating new dque", err)
+    }
 
     // Add an item to the queue
     if err := q.Enqueue(&Item{"Joe",1}); err != nil {
