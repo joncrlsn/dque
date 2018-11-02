@@ -24,13 +24,13 @@ The current code seems to work, but I'm still writing tests and creating a bench
 // Item is the thing we'll be storing in the queue
 type Item struct {
     Name string
-	Id int
+    Id int
 }
 
 // ItemBuilder creates a new item and returns a pointer to it.
 // This is used when we load a segment of the queue from disk.
 func ItemBuilder() interface{} {
-	return &Item{}
+    return &Item{}
 }
 
 func main() {
