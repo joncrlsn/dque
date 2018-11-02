@@ -57,10 +57,11 @@ func main() {
         log.Fatal("Error ")
     }
     item, ok := iface.(*Item)
-    if !ok {
+    if ok {
+        doSomething(item)
+    else {
         log.Fatal("Dequeued object is not an Item pointer")
     }
-    doSomething(item)
 }
 
 ```
