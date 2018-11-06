@@ -3,7 +3,7 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 //
-package main
+package dque
 
 //
 // This is a segment of a memory-efficient FIFO durable queue.  Items in the queue must be of the same type.
@@ -49,7 +49,7 @@ func (seg *qSegment) load() error {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
-	fmt.Printf("TEMP: Loading segment %d\n", seg.number)
+	// fmt.Printf("TEMP: Loading segment %d\n", seg.number)
 
 	// Open the file in read mode
 	file, err := os.OpenFile(seg.filePath(), os.O_RDONLY, 0644)
@@ -82,7 +82,7 @@ func (seg *qSegment) load() error {
 		if gobLen == 0 {
 			// Remove the first item from the in-memory queue
 			seg.objects = seg.objects[1:]
-			fmt.Println("TEMP: Detected delete in load()")
+			//fmt.Println("TEMP: Detected delete in load()")
 			seg.removeCount++
 			continue
 		}
@@ -104,12 +104,10 @@ func (seg *qSegment) load() error {
 		// Add item to the objects slice
 		seg.objects = append(seg.objects, object)
 
-		// Brag about it
-		fmt.Printf("TEMP: Loaded: %#v\n", object)
+		//fmt.Printf("TEMP: Loaded: %#v\n", object)
 	}
 
-	// Brag about it
-	fmt.Printf("TEMP: Loaded %d objects into memory\n", len(seg.objects))
+	//fmt.Printf("TEMP: Loaded %d objects into memory\n", len(seg.objects))
 	return nil
 }
 
@@ -122,7 +120,7 @@ func (seg *qSegment) remove() (interface{}, error) {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
-	fmt.Printf("TEMP: Removing from segment %d size %d removed %d\n", seg.number, len(seg.objects), seg.removeCount)
+	//fmt.Printf("TEMP: Removing from segment %d size %d removed %d\n", seg.number, len(seg.objects), seg.removeCount)
 
 	if len(seg.objects) == 0 {
 		// Queue is empty so return nil object (and empty_segment error)
@@ -153,7 +151,7 @@ func (seg *qSegment) remove() (interface{}, error) {
 	// Increment the delete count
 	seg.removeCount++
 
-	fmt.Printf("TEMP: Removed from segment %d %#v\n", seg.number, object)
+	//fmt.Printf("TEMP: Removed from segment %d %#v\n", seg.number, object)
 
 	return object, nil
 }
@@ -165,7 +163,7 @@ func (seg *qSegment) add(object interface{}) error {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
-	fmt.Printf("TEMP: Adding to segment %d %#v size %d removed %d\n", seg.number, object, len(seg.objects), seg.removeCount)
+	//fmt.Printf("TEMP: Adding to segment %d %#v size %d removed %d\n", seg.number, object, len(seg.objects), seg.removeCount)
 
 	// Encode the struct to a byte buffer
 	var buff bytes.Buffer
@@ -199,7 +197,7 @@ func (seg *qSegment) add(object interface{}) error {
 	seg.objects = append(seg.objects, object)
 
 	// Brag about it
-	fmt.Printf("TEMP: Added: %#v\n", object)
+	//fmt.Printf("TEMP: Added: %#v\n", object)
 
 	return nil
 }
@@ -215,9 +213,10 @@ func (seg *qSegment) size() int {
 	return len(seg.objects)
 }
 
-// bigness returns the number of objects in memory plus removed objects.
-// This number is used to keep my file from growing forever.
-func (seg *qSegment) bigness() int {
+// sizeOnDisk returns the number of objects in memory plus removed objects.
+// This number is used to keep my file from growing forever when items are
+// removed as fast as they are added.
+func (seg *qSegment) sizeOnDisk() int {
 
 	// This is heavy-handed but its safe
 	seg.mutex.Lock()
@@ -242,8 +241,7 @@ func (seg *qSegment) delete() error {
 	// Empty the in-memory slice of objects
 	seg.objects = seg.objects[:0]
 
-	// Brag about it
-	fmt.Printf("Deleted: %s\n", seg.filePath())
+	//fmt.Printf("Deleted: %s\n", seg.filePath())
 
 	return nil
 }

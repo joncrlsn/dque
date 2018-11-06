@@ -3,7 +3,7 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 //
-package main
+package dque
 
 //
 // This is a durable (persistent) FIFO queue implementation using gob encoding.
@@ -22,7 +22,6 @@ package main
 //
 
 import (
-	//"fmt"
 	"strconv"
 	"sync"
 
@@ -37,6 +36,7 @@ import (
 
 var (
 	filePattern *regexp.Regexp
+	DQUE_EMPTY error = errors.New("dque is empty")
 )
 
 func init() {
@@ -138,11 +138,8 @@ func (q *Queue) Enqueue(obj interface{}) error {
 		return errors.Wrap(err, "error adding item to the last segment")
 	}
 
-	//fmt.Println("Enqueing first segment size: ", q.firstSegment.size())
-	//fmt.Println("Enqueing last segment size: ", q.lastSegment.size())
-
 	// If this segment is full then create a new one
-	if q.lastSegment.bigness() >= q.Config.ItemsPerSegment {
+	if q.lastSegment.sizeOnDisk() >= q.Config.ItemsPerSegment {
 		// We have filled our last segment to capacity, so create a new one
 		seg, err := newQueueSegment(q.fullPath, q.lastSegment.number+1, q.builder)
 		if err != nil {
@@ -172,7 +169,7 @@ func (q *Queue) Dequeue() (interface{}, error) {
 	// Remove the first object from the first segment
 	obj, err := q.firstSegment.remove()
 	if err == emptySegment {
-		return nil, nil
+		return nil, DQUE_EMPTY
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "error removing item from the first segment")
@@ -181,7 +178,7 @@ func (q *Queue) Dequeue() (interface{}, error) {
 	// If this segment is empty and we've reached the max for this segment
 	// then delete the file and open the next one
 	if q.firstSegment.size() == 0 &&
-		q.firstSegment.bigness() >= q.Config.ItemsPerSegment {
+		q.firstSegment.sizeOnDisk() >= q.Config.ItemsPerSegment {
 
 		// Delete the file on disk
 		if err := q.firstSegment.delete(); err != nil {
@@ -283,7 +280,4 @@ func (q *Queue) load() error {
 	}
 
 	return nil
-}
-
-func main() {
 }

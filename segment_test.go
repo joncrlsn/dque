@@ -1,11 +1,13 @@
 // segement_test.go
-package main
+package dque
 
 import (
 	"fmt"
 	"log"
 	"os"
 	"testing"
+
+	"github.com/stvp/assert"
 )
 
 // item1 is the thing we'll be storing in the queue
@@ -20,38 +22,47 @@ func item1Builder() interface{} {
 }
 
 // Test_segment verifies the behavior of the queue segment.
-// TODO: Make this into a real test that programmatically verifies assumptions
-func Test_segment(t *testing.T) {
-	testDir := "./test"
+func TestSegment(t *testing.T) {
+	testDir := "./TestSegment"
 	os.RemoveAll(testDir)
-	os.Mkdir(testDir, 0755)
+	if err := os.Mkdir(testDir, 0755); err != nil {
+		t.Fatalf("Error creating directory from the TestSegment method: %s\n", err)
+	}
 
 	// Create a new segment of the queue
 	seg, err := newQueueSegment(testDir, 1, item1Builder)
 	if err != nil {
-		log.Fatalf("newQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
+		t.Fatalf("newQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
 	}
 
 	// Add some items and remove one
-	seg.add(&item1{Name: "item1"})
-	seg.add(&item1{Name: "item 2"})
+	seg.add(&item1{Name: "Number 1"})
+	assert.Equal(t, 1, seg.size(), "Expected size of 1")
+
+	seg.add(&item1{Name: "Number 2"})
+	assert.Equal(t, 2, seg.size(), "Expected size of 2")
 	_, err = seg.remove()
 	if err != nil {
-		log.Fatalf("Remove() failed with '%s'\n", err.Error())
+		t.Fatalf("Remove() failed with '%s'\n", err.Error())
 	}
+	assert.Equal(t, 1, seg.size(), "Expected size of 1")
+	assert.Equal(t, 2, seg.sizeOnDisk(), "Expected sizeOnDisk of 2")
 	seg.add(&item1{Name: "item3"})
+	assert.Equal(t, 2, seg.size(), "Expected size of 2")
 	_, err = seg.remove()
 	if err != nil {
-		log.Fatalf("Remove() failed with '%s'\n", err.Error())
+		t.Fatalf("Remove() failed with '%s'\n", err.Error())
 	}
+	assert.Equal(t, 1, seg.size(), "Expected size of 1")
 
 	fmt.Println("Recreating the segment from disk")
 
 	seg, err = openQueueSegment(testDir, 1, item1Builder)
 	if err != nil {
-		log.Fatalf("openQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
+		t.Fatalf("openQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
 	}
 	log.Println("Opened segment: ", seg.filePath())
+	assert.Equal(t, 1, seg.size(), "Expected size of 1")
 
 	log.Println("Removing all items:")
 	for {
@@ -60,7 +71,11 @@ func Test_segment(t *testing.T) {
 			if err == emptySegment {
 				break
 			}
-			log.Fatalf("Remove() failed with '%s'\n", err.Error())
+			t.Fatalf("Remove() failed with '%s'\n", err.Error())
 		}
+	}
+
+	if err := os.RemoveAll(testDir); err != nil {
+		t.Fatalf("Error cleaning up directory from the TestSegment method with '%s'\n", err.Error())
 	}
 }

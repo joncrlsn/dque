@@ -1,5 +1,5 @@
 // queue_test.go
-package main
+package dque
 
 import (
 	"fmt"
@@ -58,6 +58,10 @@ func TestQueue_AddRemoveLoop(t *testing.T) {
 
 	// Assert that the first segment is #2
 	assert.Equal(t, 2, q.firstSegment.number, "After opening, the first segment is not 2")
+
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error cleaning up the queue directory", err)
+	}
 }
 
 // Adds 2 and removes 1 in a loop to ensure that when we've filled
@@ -97,10 +101,14 @@ func TestQueue_Add2Remove1(t *testing.T) {
 	q = openQ(t, qName)
 
 	// Assert that we have more than one segment
-	assert.NotEqual(t, q.firstSegment, q.lastSegment, "After opening, the first segment cannot match the second")
+	assert.NotEqual(t, q.firstSegment, q.lastSegment, "After opening, the first segment can not match the second")
 
 	// Assert that the first segment is #2
 	assert.Equal(t, 2, q.lastSegment.number, "After opening, the last segment is not 2")
+
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error cleaning up the queue directory", err)
+	}
 }
 
 // Adds 7 and removes 6
@@ -157,6 +165,10 @@ func TestQueue_Add7Remove6(t *testing.T) {
 
 	// Assert that the last segment is #3
 	assert.Equal(t, 3, q.lastSegment.number, "After opening, the last segment is not 3")
+
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error cleaning up the queue directory", err)
+	}
 }
 
 func TestQueue_EmptyDequeue(t *testing.T) {
@@ -169,11 +181,11 @@ func TestQueue_EmptyDequeue(t *testing.T) {
 	q := newQ(t, qName)
 
 	item, err := q.Dequeue()
-	if err != nil {
-		t.Fatal("Error dequeueing", err)
-	}
-	if item != nil {
-		t.Fatal("Expected nil if queue is empty")
+	assert.Equal(t, DQUE_EMPTY, err, "Expected a QUEUE_EMPTY error")
+	assert.Nil(t, item, "Expected nil because queue is empty")
+
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error cleaning up the queue directory", err)
 	}
 }
 
