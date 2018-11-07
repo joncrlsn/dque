@@ -2,7 +2,7 @@
 
 dque is a persistent, scalable FIFO queue for Go.  Because it frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, I wrote this to show that a simple, fast, persistent FIFO queue can be written.
 
-Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the segment implementation of this queue which holds the head and the tail of the queue in memory.
+Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory.
 
 The performance is pretty good. On a 3 year old MacBook Pro with SSD, I am able to get around 350 microseconds per enqueue and 400 microseconds per dequeue (for a small struct).
 

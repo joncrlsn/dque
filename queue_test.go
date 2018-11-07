@@ -189,7 +189,7 @@ func TestQueue_EmptyDequeue(t *testing.T) {
 	}
 }
 
-func newQ(t *testing.T, qName string) *Queue {
+func newQ(t *testing.T, qName string) *DQue {
 	// Create a new segment with segment size of 3
 	q, err := New(qName, ".", 3, item2Builder)
 	if err != nil {
@@ -198,7 +198,7 @@ func newQ(t *testing.T, qName string) *Queue {
 	return q
 }
 
-func openQ(t *testing.T, qName string) *Queue {
+func openQ(t *testing.T, qName string) *DQue {
 	// Open an existing segment with segment size of 3
 	q, err := Open(qName, ".", 3, item2Builder)
 	if err != nil {

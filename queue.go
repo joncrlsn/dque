@@ -6,7 +6,7 @@
 package dque
 
 //
-// This is a durable (persistent) FIFO queue implementation using gob encoding.
+// A scalable, embedded, persistent FIFO queue implementation using gob encoding.
 //
 
 // Test Cases:
@@ -36,7 +36,7 @@ import (
 
 var (
 	filePattern *regexp.Regexp
-	DQUE_EMPTY error = errors.New("dque is empty")
+	DQUE_EMPTY  error = errors.New("dque is empty")
 )
 
 func init() {
@@ -47,7 +47,7 @@ type Config struct {
 	ItemsPerSegment int
 }
 
-type Queue struct {
+type DQue struct {
 	Name    string
 	DirPath string
 	Config  Config
@@ -60,7 +60,7 @@ type Queue struct {
 }
 
 // New creats a new durable queue
-func New(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*Queue, error) {
+func New(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*DQue, error) {
 
 	// Validation
 	if len(name) == 0 {
@@ -81,7 +81,7 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 		return nil, errors.Wrap(err, "error creating queue directory "+fullPath)
 	}
 
-	q := Queue{Name: name, DirPath: dirPath}
+	q := DQue{Name: name, DirPath: dirPath}
 	q.fullPath = fullPath
 	q.Config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
@@ -90,7 +90,7 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 }
 
 // Open opens an existing durable queue
-func Open(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*Queue, error) {
+func Open(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*DQue, error) {
 
 	// Validation
 	if len(name) == 0 {
@@ -107,7 +107,7 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 		return nil, errors.New("the given queue does not exist (" + fullPath + ")")
 	}
 
-	q := Queue{Name: name, DirPath: dirPath}
+	q := DQue{Name: name, DirPath: dirPath}
 	q.fullPath = fullPath
 	q.Config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
@@ -120,7 +120,7 @@ func NewConfig(itemsPerSegment int) Config {
 }
 
 // Enqueue adds an item to the end of the queue
-func (q *Queue) Enqueue(obj interface{}) error {
+func (q *DQue) Enqueue(obj interface{}) error {
 
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
@@ -153,7 +153,7 @@ func (q *Queue) Enqueue(obj interface{}) error {
 
 // Dequeue removes and returns the first item in the queue.
 // If the queue is empty, nil is returned
-func (q *Queue) Dequeue() (interface{}, error) {
+func (q *DQue) Dequeue() (interface{}, error) {
 
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
@@ -219,7 +219,7 @@ func (q *Queue) Dequeue() (interface{}, error) {
 }
 
 // load populates the queue from disk
-func (q *Queue) load() error {
+func (q *DQue) load() error {
 
 	// Find all queue files
 	files, err := ioutil.ReadDir(q.fullPath)
