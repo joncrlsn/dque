@@ -128,6 +128,9 @@ func TestQueue_Add7Remove6(t *testing.T) {
 		}
 	}
 
+	// Check the Size calculation
+	assert.Equal(t, 7, q.Size(), "the size is calculated wrong.  Should be 7")
+
 	// Assert that the first segment is #3
 	assert.Equal(t, 1, q.firstSegment.number, "the first segment is not 1")
 
@@ -140,6 +143,9 @@ func TestQueue_Add7Remove6(t *testing.T) {
 		if err != nil {
 			t.Fatal("Error dequeueing", err)
 		}
+
+		// Check the Size calculation
+		assert.Equal(t, 6-i, q.Size(), "the size is calculated wrong.")
 		item, ok := iface.(item2)
 		if ok {
 			fmt.Printf("Dequeued %T %t %#v\n", item, ok, item)
@@ -181,7 +187,7 @@ func TestQueue_EmptyDequeue(t *testing.T) {
 	q := newQ(t, qName)
 
 	item, err := q.Dequeue()
-	assert.Equal(t, DQUE_EMPTY, err, "Expected a QUEUE_EMPTY error")
+	assert.Equal(t, EMPTY, err, "Expected a QUEUE_EMPTY error")
 	assert.Nil(t, item, "Expected nil because queue is empty")
 
 	if err := os.RemoveAll(qName); err != nil {

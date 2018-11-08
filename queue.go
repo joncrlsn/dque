@@ -36,7 +36,7 @@ import (
 
 var (
 	filePattern *regexp.Regexp
-	DQUE_EMPTY  error = errors.New("dque is empty")
+	EMPTY       error = errors.New("dque is empty")
 )
 
 func init() {
@@ -89,7 +89,7 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 	return &q, nil
 }
 
-// Open opens an existing durable queue
+// Open opens an existing durable queue.
 func Open(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*DQue, error) {
 
 	// Validation
@@ -113,6 +113,27 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 	q.builder = builder
 	q.load()
 	return &q, nil
+}
+
+// NewOrOpen either creates a new queue or opens an existing durable queue.
+func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*DQue, error) {
+
+	// Validation
+	if len(name) == 0 {
+		return nil, errors.New("the queue name requires a value.")
+	}
+	if len(dirPath) == 0 {
+		return nil, errors.New("the queue directory requires a value.")
+	}
+	if !dirExists(dirPath) {
+		return nil, errors.New("the given queue directory is not valid (" + dirPath + ")")
+	}
+	fullPath := path.Join(dirPath, name)
+	if dirExists(fullPath) {
+		return Open(name, dirPath, itemsPerSegment, builder)
+	}
+
+	return New(name, dirPath, itemsPerSegment, builder)
 }
 
 func NewConfig(itemsPerSegment int) Config {
@@ -169,18 +190,18 @@ func (q *DQue) Dequeue() (interface{}, error) {
 	// Remove the first object from the first segment
 	obj, err := q.firstSegment.remove()
 	if err == emptySegment {
-		return nil, DQUE_EMPTY
+		return nil, EMPTY
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "error removing item from the first segment")
 	}
 
 	// If this segment is empty and we've reached the max for this segment
-	// then delete the file and open the next one
+	// then delete the file and open the next one.
 	if q.firstSegment.size() == 0 &&
 		q.firstSegment.sizeOnDisk() >= q.Config.ItemsPerSegment {
 
-		// Delete the file on disk
+		// Delete the segment file
 		if err := q.firstSegment.delete(); err != nil {
 			return obj, errors.Wrap(err, "error deleting queue segment "+q.firstSegment.filePath()+". Queue is in an inconsistent state")
 		}
@@ -216,6 +237,19 @@ func (q *DQue) Dequeue() (interface{}, error) {
 	}
 
 	return obj, nil
+}
+
+// Size returns the number of items in the queue. This number will be accurate
+// only if the itemsPerSegment value has not changed since the queue was last empty.
+func (q *DQue) Size() int {
+	if q.firstSegment.number == q.lastSegment.number {
+		return q.firstSegment.size()
+	}
+	if q.firstSegment.number == q.lastSegment.number+1 {
+		return q.firstSegment.size() + q.lastSegment.size()
+	}
+	numSegmentsBetween := (q.lastSegment.number - q.firstSegment.number - 1)
+	return q.firstSegment.size() + (numSegmentsBetween * q.Config.ItemsPerSegment) + q.lastSegment.size()
 }
 
 // load populates the queue from disk
