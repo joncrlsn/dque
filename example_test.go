@@ -5,7 +5,8 @@ import (
 	//"github.com/joncrlsn/dque"
 )
 
-// Item is the thing we'll be storing in the queue
+// Item is what we'll be storing in the queue.  It can be any struct
+// as long as the fields you want stored are public.
 type Item struct {
 	Name string
 	Id   int
