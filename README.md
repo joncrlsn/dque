@@ -1,12 +1,12 @@
 # dque - simple embedded durable queue for Go
 
-dque is a persistent, scalable, FIFO queue for Go.  Because it frustrated me (Jon Carlson) that the only embedded persistent queues I could find for Go were wrappers around key value stores, I wrote this to show that a simple, fast, persistent FIFO queue can be written.
+dque is a persistent, scalable, FIFO queue for Go.  I love simple tools that do one thing well.  Because it frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, I wrote this to show that a simple, fast, persistent, embedded, FIFO queue could be written without being dependent on a storage engine that is better suited to other use cases.
 
 Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory.
 
 The performance is pretty good. On a 3 year old MacBook Pro with SSD, I am able to get around 350 microseconds per enqueue and 400 microseconds per dequeue (for a small struct).
 
-Please note that I don't claim to be very good at maintaining an active project.  I'd like to know about bugs so I can fix them, but if you want to add features or make big changes then please fork this project.  If you do good things with it, I'll add a link on this page to your project.
+Please note that I don't claim to be very good at maintaining an active project.  I'd like to know about bugs so I can fix them, but if you want to make big changes then please fork this project.  If you do good things with it, I'll add a link on this page to your project.
 
 ### implementation
 * The queue is held in segments of a configurable size. Each segment corresponds with a file on disk. If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.
