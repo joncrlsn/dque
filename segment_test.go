@@ -54,8 +54,7 @@ func TestSegment(t *testing.T) {
 	}
 	assert(t, 1 == seg.size(), "Expected size of 1")
 
-	fmt.Println("Recreating the segment from disk")
-
+	// Recreate the segment from disk
 	seg, err = openQueueSegment(testDir, 1, item1Builder)
 	if err != nil {
 		t.Fatalf("openQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
