@@ -5,9 +5,9 @@ dque is:
 * persistent -- survives program restarts
 * scalable -- not limited by your RAM, but by your disk space
 * FIFO - First in First Out
-* synchronized and safe for concurrent usage
+* synchronized so it is safe for concurrent usage
 
-I love tools that do one thing well.  This queue implementation should fit into that category.  It frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, so I wrote this to show that it could be done without being dependent on a storage engine that is better suited to other use cases.
+I love tools that do one thing well.  Hopefully this fits that category.  It frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, so I wrote this to show that it could be done without being dependent on a storage engine that is better suited to other use cases.
 
 Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory as well as storing the segment files in between.
 
@@ -21,7 +21,7 @@ The performance is pretty good. On a 3 year old MacBook Pro with SSD, I am able 
   * Only public fields in a struct will be stored.
   * You must provide a function that returns a pointer to a new struct of the type stored in the queue.  This function is used when loading segments into memory from disk.  If you can think of a better way to handle this, I'd love to hear it.
 * Queue segment implementation:
-  * For nice visuals, see [Gabor Cselle's documentation here](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  Note that Gabor's implementation kept the entire queue in memory as well as disk.
+  * For nice visuals, see [Gabor Cselle's documentation here](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  Note that Gabor's implementation kept the entire queue in memory as well as disk.  dque keeps only the head and tail segments in memory.
   * Enqueueing an item adds it both to the end of the last segment file and to the in-memory item slice for that segment.
   * When a segment reaches its maximum size a new segment is created.
   * Dequeueing an item removes it from the beginning of the in-memory slice and appends a "delete" marker to the end of the segment file.  This allows the item to be left in the file until the number of delete markers matches the number of items, at which point the entire file is deleted.
@@ -96,7 +96,7 @@ func main() {
 	log.Println("Size should be zero:", q.Size())
 
 	// Assert type of the response to an Item pointer so we can work with it
-	item, ok := iface.(*Item)
+	item, ok := iface.(*dque.Item)
 	if !ok {
 		log.Fatal("Dequeued object is not an Item pointer")
 	}
@@ -104,10 +104,13 @@ func main() {
 	doSomething(item)
 }
 
-func doSomething(item *Item) {
+func doSomething(item *dque.Item) {
 	log.Println("Dequeued", item)
 }
 ```
 
-### todo
-* store the segment size in a file inside the queue. Then it only needs to be specified on dque.New(...)
+### todo?
+* store the segment size in a config file inside the queue. Then it only needs to be specified on dque.New(...)
+* add Lock() and Unlock() methods so you can peek at the first item and then conditionally dequeue it without worrying that another goroutine has grabbed it out from under you.  The use case is when you don't want to actually remove it from the queue until you know you were able to successfully handle it.
+* add a BlockedDequeue() method that blocks until the queue is no longer empty, then returns the new item.
+
