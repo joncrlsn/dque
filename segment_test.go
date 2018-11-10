@@ -3,11 +3,10 @@ package dque
 
 import (
 	"fmt"
-	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
-
-	"github.com/stvp/assert"
 )
 
 // item1 is the thing we'll be storing in the queue
@@ -37,23 +36,23 @@ func TestSegment(t *testing.T) {
 
 	// Add some items and remove one
 	seg.add(&item1{Name: "Number 1"})
-	assert.Equal(t, 1, seg.size(), "Expected size of 1")
+	assert(t, 1 == seg.size(), "Expected size of 1")
 
 	seg.add(&item1{Name: "Number 2"})
-	assert.Equal(t, 2, seg.size(), "Expected size of 2")
+	assert(t, 2 == seg.size(), "Expected size of 2")
 	_, err = seg.remove()
 	if err != nil {
 		t.Fatalf("Remove() failed with '%s'\n", err.Error())
 	}
-	assert.Equal(t, 1, seg.size(), "Expected size of 1")
-	assert.Equal(t, 2, seg.sizeOnDisk(), "Expected sizeOnDisk of 2")
+	assert(t, 1 == seg.size(), "Expected size of 1")
+	assert(t, 2 == seg.sizeOnDisk(), "Expected sizeOnDisk of 2")
 	seg.add(&item1{Name: "item3"})
-	assert.Equal(t, 2, seg.size(), "Expected size of 2")
+	assert(t, 2 == seg.size(), "Expected size of 2")
 	_, err = seg.remove()
 	if err != nil {
 		t.Fatalf("Remove() failed with '%s'\n", err.Error())
 	}
-	assert.Equal(t, 1, seg.size(), "Expected size of 1")
+	assert(t, 1 == seg.size(), "Expected size of 1")
 
 	fmt.Println("Recreating the segment from disk")
 
@@ -61,10 +60,8 @@ func TestSegment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("openQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
 	}
-	log.Println("Opened segment: ", seg.filePath())
-	assert.Equal(t, 1, seg.size(), "Expected size of 1")
+	assert(t, 1 == seg.size(), "Expected size of 1")
 
-	log.Println("Removing all items:")
 	for {
 		_, err := seg.remove()
 		if err != nil {
@@ -77,5 +74,33 @@ func TestSegment(t *testing.T) {
 
 	if err := os.RemoveAll(testDir); err != nil {
 		t.Fatalf("Error cleaning up directory from the TestSegment method with '%s'\n", err.Error())
+	}
+}
+
+// TestSegment_Open verifies the behavior of the openSegment function.
+func TestSegment_Open(t *testing.T) {
+	testDir := "./TestSegment_Open"
+	os.RemoveAll(testDir)
+	if err := os.Mkdir(testDir, 0755); err != nil {
+		t.Fatalf("Error creating directory from the TestSegment method: %s\n", err)
+	}
+
+	seg, err := openQueueSegment(testDir, 1, item1Builder)
+	if err == nil {
+		t.Fatalf("openQueueSegment('%s') should have failed\n", testDir)
+	}
+	assert(t, seg == nil, "segment after failure must be nil")
+
+	if err := os.RemoveAll(testDir); err != nil {
+		t.Fatalf("Error cleaning up directory from the TestSegment_Open method with '%s'\n", err.Error())
+	}
+}
+
+// assert fails the test if the condition is false.
+func assert(tb testing.TB, condition bool, msg string, v ...interface{}) {
+	if !condition {
+		_, file, line, _ := runtime.Caller(1)
+		fmt.Printf("\033[31m%s:%d: "+msg+"\033[39m\n\n", append([]interface{}{filepath.Base(file), line}, v...)...)
+		tb.FailNow()
 	}
 }

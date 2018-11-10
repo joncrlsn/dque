@@ -10,9 +10,6 @@ func dirExists(path string) bool {
 	if err == nil {
 		return fileInfo.IsDir()
 	}
-	if os.IsNotExist(err) {
-		return false
-	}
 	return false
 }
 
@@ -21,9 +18,6 @@ func fileExists(path string) bool {
 	fileInfo, err := os.Stat(path)
 	if err == nil {
 		return !fileInfo.IsDir()
-	}
-	if os.IsNotExist(err) {
-		return false
 	}
 	return false
 }

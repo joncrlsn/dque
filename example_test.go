@@ -1,8 +1,13 @@
-package dque
+package dque_test
+
+//
+// Run with run test -
+//
 
 import (
 	"log"
-	//"github.com/joncrlsn/dque"
+
+	"github.com/joncrlsn/dque"
 )
 
 // Item is what we'll be storing in the queue.  It can be any struct
@@ -24,7 +29,7 @@ func ExampleQueue_main() {
 	segmentSize := 50
 
 	// Create a new queue with segment size of 50
-	q, err := NewOrOpen(qName, qDir, segmentSize, ItemBuilder)
+	q, err := dque.NewOrOpen(qName, qDir, segmentSize, ItemBuilder)
 	if err != nil {
 		log.Fatal("Error creating new dque ", err)
 	}
@@ -38,15 +43,22 @@ func ExampleQueue_main() {
 
 	// You can reconsitute the queue from disk at any time
 	// as long as you never use the old instance
-	q, err = Open(qName, qDir, segmentSize, ItemBuilder)
+	q, err = dque.Open(qName, qDir, segmentSize, ItemBuilder)
 	if err != nil {
 		log.Fatal("Error opening existing dque ", err)
 	}
 
-	// Dequeue an item and act on it
+	// Peek at the next item in the queue
 	var iface interface{}
+	if iface, err = q.Peek(); err != nil {
+		if err != dque.EMPTY {
+			log.Fatal("Error peeking at item ", err)
+		}
+	}
+
+	// Dequeue the next item in the queue
 	if iface, err = q.Dequeue(); err != nil {
-		if err != EMPTY {
+		if err != dque.EMPTY {
 			log.Fatal("Error dequeuing item ", err)
 		}
 	}
@@ -64,4 +76,8 @@ func ExampleQueue_main() {
 
 func doSomething(item *Item) {
 	log.Println("Dequeued", item)
+}
+
+func main() {
+
 }

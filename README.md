@@ -1,12 +1,18 @@
 # dque - simple embedded durable queue for Go
 
-dque is a persistent, scalable, FIFO queue for Go.  I love simple tools that do one thing well.  Because it frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, I wrote this to show that a simple, fast, persistent, embedded, FIFO queue could be written without being dependent on a storage engine that is better suited to other use cases.
+dque is:
+* embedded into your Golang program
+* persistent -- survives program restarts
+* scalable -- not limited by your RAM, but by your disk space
+* FIFO - First in First Out
+* synchronized and safe for concurrent usage
+* as simple and useful as I could make it
 
-Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory.
+I love tools that do one thing well.  This queue shoud fit into that category.  It frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, so I wrote this to show that a simple, fast, persistent, embedded, FIFO queue could be written without being dependent on a storage engine that is better suited to other use cases.
+
+Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory as well as storing the segment files in between.
 
 The performance is pretty good. On a 3 year old MacBook Pro with SSD, I am able to get around 350 microseconds per enqueue and 400 microseconds per dequeue (for a small struct).
-
-Please note that I don't claim to be very good at maintaining an active project.  I'd like to know about bugs so I can fix them, but if you want to make big changes then please fork this project.  If you do good things with it, I'll add a link on this page to your project.
 
 ### implementation
 * The queue is held in segments of a configurable size. Each segment corresponds with a file on disk. If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.
@@ -15,7 +21,8 @@ Please note that I don't claim to be very good at maintaining an active project.
   * Only one type of struct can be stored in each queue.
   * Only public fields in a struct will be stored.
   * You must provide a function that returns a pointer to a new struct of the type stored in the queue.  This function is used when loading segments into memory from disk.  If you can think of a better way to handle this, I'd love to hear it.
-* Segment implementation:
+* Queue segment implementation:
+  * For nice visuals, see [Gabor Cselle's documentation here](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  Note that Gabor's implementation kept the entire queue in memory as well as disk.
   * Enqueueing an item adds it both to the end of the last segment file and to the in-memory item slice for that segment.
   * When a segment reaches its maximum size a new segment is created.
   * Dequeueing an item removes it from the beginning of the in-memory slice and appends a "delete" marker to the end of the segment file.  This allows the item to be left in the file until the number of delete markers matches the number of items, at which point the entire file is deleted.

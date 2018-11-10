@@ -1,11 +1,13 @@
 // benchmark_test.go
-package dque
+package dque_test
 
 import (
 	"fmt"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/joncrlsn/dque"
 )
 
 // item3 is the thing we'll be storing in the queue
@@ -33,7 +35,7 @@ func BenchmarkEnqueue(b *testing.B) {
 	}
 
 	// Create the queue
-	q, err := New(qName, ".", 100, item3Builder)
+	q, err := dque.New(qName, ".", 100, item3Builder)
 	if err != nil {
 		b.Fatal("Error creating new dque", err)
 	}
@@ -49,6 +51,11 @@ func BenchmarkEnqueue(b *testing.B) {
 
 	elapsed := time.Now().Sub(start)
 	fmt.Printf("Elapsed time to enqueue %d items: %v\n", b.N, elapsed)
+
+	// Clean up from the run
+	if err := os.RemoveAll(qName); err != nil {
+		b.Fatal("Error removing queue directory for BenchmarkDequeue", err)
+	}
 }
 
 func BenchmarkDequeue(b *testing.B) {
@@ -63,12 +70,12 @@ func BenchmarkDequeue(b *testing.B) {
 	}
 
 	// Create the queue
-	q, err := New(qName, ".", 100, item3Builder)
+	q, err := dque.New(qName, ".", 100, item3Builder)
 	if err != nil {
 		b.Fatal("Error creating new dque", err)
 	}
 
-	for i := 0; i < 3000; i++ {
+	for i := 0; i < 4000; i++ {
 		err := q.Enqueue(item3{"Sorta, kind of, a Big Long Name", i, true})
 		if err != nil {
 			b.Fatal("Error enqueuing to dque", err)

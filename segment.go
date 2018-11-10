@@ -111,6 +111,25 @@ func (seg *qSegment) load() error {
 	return nil
 }
 
+// peek returns the first item in the segment without removing it.
+// If the queue is already empty, the emptySegment error will be returned.
+func (seg *qSegment) peek() (interface{}, error) {
+
+	// This is heavy-handed but its safe
+	seg.mutex.Lock()
+	defer seg.mutex.Unlock()
+
+	if len(seg.objects) == 0 {
+		// Queue is empty so return nil object (and emptySegment error)
+		return nil, emptySegment
+	}
+
+	// Save a reference to the first item in the in-memory queue
+	object := seg.objects[0]
+
+	return object, nil
+}
+
 // remove removes and returns the first item in the segment and adds
 // a zero length marker to the end of the queue file to signify a removal.
 // If the queue is already empty, the emptySegment error will be returned.
@@ -288,8 +307,4 @@ func openQueueSegment(dirPath string, number int, builder func() interface{}) (*
 		return nil, errors.Wrap(err, "Unable to load queue segment in "+dirPath)
 	}
 	return &seg, nil
-}
-
-func buildFileName(num int) string {
-	return fmt.Sprintf("%010d.dque", num)
 }

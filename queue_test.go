@@ -1,12 +1,14 @@
 // queue_test.go
-package dque
+package dque_test
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
-	"github.com/stvp/assert"
+	"github.com/joncrlsn/dque"
 )
 
 // item2 is the thing we'll be storing in the queue
@@ -33,31 +35,35 @@ func TestQueue_AddRemoveLoop(t *testing.T) {
 	q := newQ(t, qName)
 
 	for i := 0; i < 4; i++ {
-		var item interface{}
 		if err := q.Enqueue(&item2{i}); err != nil {
 			t.Fatal("Error enqueueing", err)
 		}
-		item, err = q.Dequeue()
+		_, err = q.Dequeue()
 		if err != nil {
 			t.Fatal("Error dequeueing", err)
 		}
-		fmt.Printf("Dequeued %#v:", item)
 	}
 
+	assert(t, 0 == q.Size(), "Size is not 0")
+
+	firstSegNum, lastSegNum := q.SegmentNumbers()
+
 	// Assert that we have just one segment
-	assert.Equal(t, q.firstSegment, q.lastSegment, "The first segment must match the second")
+	assert(t, firstSegNum == lastSegNum, "The first segment must match the last")
 
 	// Assert that the first segment is #2
-	assert.Equal(t, 2, q.firstSegment.number, "The first segment is not 2")
+	assert(t, 2 == firstSegNum, "The first segment is not 2")
 
 	// Now reopen the queue and check our assertions again.
 	q = openQ(t, qName)
 
+	firstSegNum, lastSegNum = q.SegmentNumbers()
+
 	// Assert that we have just one segment
-	assert.Equal(t, q.firstSegment, q.lastSegment, "After opening, the first segment must match the second")
+	assert(t, firstSegNum == lastSegNum, "After opening, the first segment must match the second")
 
 	// Assert that the first segment is #2
-	assert.Equal(t, 2, q.firstSegment.number, "After opening, the first segment is not 2")
+	assert(t, 2 == firstSegNum, "After opening, the first segment is not 2")
 
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error cleaning up the queue directory", err)
@@ -88,23 +94,33 @@ func TestQueue_Add2Remove1(t *testing.T) {
 		if err != nil {
 			t.Fatal("Error dequeueing", err)
 		}
-		fmt.Println("Dequeued:", item)
+		assert(t, item != nil, "Item is nil")
 	}
 
+	firstSegNum, lastSegNum := q.SegmentNumbers()
+
 	// Assert that we have more than one segment
-	assert.NotEqual(t, q.firstSegment, q.lastSegment, "The first segment cannot match the second")
+	assert(t, firstSegNum < lastSegNum, "The first segment cannot match the second")
 
 	// Assert that the first segment is #2
-	assert.Equal(t, 2, q.lastSegment.number, "The last segment is not 2")
+	assert(t, 2 == lastSegNum, "The last segment is not 2")
 
 	// Now reopen the queue and check our assertions again.
 	q = openQ(t, qName)
 
+	firstSegNum, lastSegNum = q.SegmentNumbers()
+
 	// Assert that we have more than one segment
-	assert.NotEqual(t, q.firstSegment, q.lastSegment, "After opening, the first segment can not match the second")
+	assert(t, firstSegNum < lastSegNum, "After opening, the first segment can not match the second")
 
 	// Assert that the first segment is #2
-	assert.Equal(t, 2, q.lastSegment.number, "After opening, the last segment is not 2")
+	assert(t, 2 == lastSegNum, "After opening, the last segment must be 2")
+
+	// Test Peek to make sure the size doesn't change
+	assert(t, 2 == q.Size(), "Queue size is not 2 before peeking")
+	obj, err := q.Peek()
+	assert(t, 2 == q.Size(), "Queue size is not 2 after peeking")
+	assert(t, obj != nil, "Object is nil")
 
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error cleaning up the queue directory", err)
@@ -129,13 +145,15 @@ func TestQueue_Add7Remove6(t *testing.T) {
 	}
 
 	// Check the Size calculation
-	assert.Equal(t, 7, q.Size(), "the size is calculated wrong.  Should be 7")
+	assert(t, 7 == q.Size(), "the size is calculated wrong.  Should be 7")
+
+	firstSegNum, lastSegNum := q.SegmentNumbers()
 
 	// Assert that the first segment is #3
-	assert.Equal(t, 1, q.firstSegment.number, "the first segment is not 1")
+	assert(t, 1 == firstSegNum, "the first segment is not 1")
 
 	// Assert that the last segment is #3
-	assert.Equal(t, 3, q.lastSegment.number, "the last segment is not 3")
+	assert(t, 3 == lastSegNum, "the last segment is not 3")
 
 	// Dequeue 6 items
 	for i := 0; i < 6; i++ {
@@ -145,32 +163,34 @@ func TestQueue_Add7Remove6(t *testing.T) {
 		}
 
 		// Check the Size calculation
-		assert.Equal(t, 6-i, q.Size(), "the size is calculated wrong.")
+		assert(t, 6-i == q.Size(), "the size is calculated wrong.")
 		item, ok := iface.(item2)
 		if ok {
 			fmt.Printf("Dequeued %T %t %#v\n", item, ok, item)
-			assert.Equal(t, i, item.Id, "Unexpected itemId")
+			assert(t, i == item.Id, "Unexpected itemId")
 		} else {
 			item, ok := iface.(*item2)
-			assert.True(t, ok, "Dequeued object is not of type *item2")
-			assert.Equal(t, i, item.Id, "Unexpected itemId")
+			assert(t, ok, "Dequeued object is not of type *item2")
+			assert(t, i == item.Id, "Unexpected itemId")
 		}
 	}
 
+	firstSegNum, lastSegNum = q.SegmentNumbers()
+
 	// Assert that we have only one segment
-	assert.Equal(t, q.firstSegment, q.lastSegment, "The first segment must match the second")
+	assert(t, firstSegNum == lastSegNum, "The first segment must match the second")
 
 	// Assert that the first segment is #3
-	assert.Equal(t, 3, q.firstSegment.number, "The last segment is not 3")
+	assert(t, 3 == firstSegNum, "The last segment is not 3")
 
 	// Now reopen the queue and check our assertions again.
 	q = openQ(t, qName)
 
 	// Assert that we have more than one segment
-	assert.Equal(t, q.firstSegment, q.lastSegment, "After opening, the first segment must match the second")
+	assert(t, firstSegNum == lastSegNum, "After opening, the first segment must match the second")
 
 	// Assert that the last segment is #3
-	assert.Equal(t, 3, q.lastSegment.number, "After opening, the last segment is not 3")
+	assert(t, 3 == lastSegNum, "After opening, the last segment is not 3")
 
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error cleaning up the queue directory", err)
@@ -178,37 +198,74 @@ func TestQueue_Add7Remove6(t *testing.T) {
 }
 
 func TestQueue_EmptyDequeue(t *testing.T) {
-	qName := "test1"
+	qName := "testEmptyDequeue"
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error removing queue directory", err)
 	}
 
-	// Create new queue with segment size 3
+	// Create new queue
 	q := newQ(t, qName)
+	assert(t, 0 == q.Size(), "Expected an empty queue")
 
+	// Dequeue an item from the empty queue
 	item, err := q.Dequeue()
-	assert.Equal(t, EMPTY, err, "Expected a QUEUE_EMPTY error")
-	assert.Nil(t, item, "Expected nil because queue is empty")
+	assert(t, dque.EMPTY == err, "Expected an EMPTY error")
+	assert(t, item == nil, "Expected nil because queue is empty")
 
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error cleaning up the queue directory", err)
 	}
 }
 
-func newQ(t *testing.T, qName string) *DQue {
+func TestQueue_NewOrOpen(t *testing.T) {
+	qName := "testNewOrOpen"
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory", err)
+	}
+
+	// Create new queue
+	newOrOpenQ(t, qName)
+
+	// Open the same queue
+	newOrOpenQ(t, qName)
+
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error cleaning up the queue directory", err)
+	}
+}
+
+func newOrOpenQ(t *testing.T, qName string) *dque.DQue {
 	// Create a new segment with segment size of 3
-	q, err := New(qName, ".", 3, item2Builder)
+	q, err := dque.NewOrOpen(qName, ".", 3, item2Builder)
+	if err != nil {
+		t.Fatal("Error creating or opening dque", err)
+	}
+	return q
+}
+
+func newQ(t *testing.T, qName string) *dque.DQue {
+	// Create a new segment with segment size of 3
+	q, err := dque.New(qName, ".", 3, item2Builder)
 	if err != nil {
 		t.Fatal("Error creating new dque", err)
 	}
 	return q
 }
 
-func openQ(t *testing.T, qName string) *DQue {
+func openQ(t *testing.T, qName string) *dque.DQue {
 	// Open an existing segment with segment size of 3
-	q, err := Open(qName, ".", 3, item2Builder)
+	q, err := dque.Open(qName, ".", 3, item2Builder)
 	if err != nil {
 		t.Fatal("Error opening dque", err)
 	}
 	return q
+}
+
+// assert fails the test if the condition is false.
+func assert(tb testing.TB, condition bool, msg string, v ...interface{}) {
+	if !condition {
+		_, file, line, _ := runtime.Caller(1)
+		fmt.Printf("\033[31m%s:%d: "+msg+"\033[39m\n\n", append([]interface{}{filepath.Base(file), line}, v...)...)
+		tb.FailNow()
+	}
 }

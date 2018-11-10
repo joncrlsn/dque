@@ -74,7 +74,7 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 	}
 	fullPath := path.Join(dirPath, name)
 	if dirExists(fullPath) {
-		return nil, errors.New("the given queue directory already exists: " + fullPath + ". Use Open instead")
+		return nil, errors.New("the given queue directory already exists: " + fullPath + ". Use Open instead.")
 	}
 
 	if err := os.Mkdir(fullPath, 0755); err != nil {
@@ -136,10 +136,6 @@ func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() 
 	return New(name, dirPath, itemsPerSegment, builder)
 }
 
-func NewConfig(itemsPerSegment int) Config {
-	return Config{ItemsPerSegment: itemsPerSegment}
-}
-
 // Enqueue adds an item to the end of the queue
 func (q *DQue) Enqueue(obj interface{}) error {
 
@@ -173,19 +169,12 @@ func (q *DQue) Enqueue(obj interface{}) error {
 }
 
 // Dequeue removes and returns the first item in the queue.
-// If the queue is empty, nil is returned
+// If the queue is empty, nil and EMPTY are returned
 func (q *DQue) Dequeue() (interface{}, error) {
 
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
-
-	if len(q.firstSegment.dirPath) == 0 {
-		// We need to load our state from disk
-		if err := q.load(); err != nil {
-			return nil, errors.Wrap(err, "error loading queue "+q.Name)
-		}
-	}
 
 	// Remove the first object from the first segment
 	obj, err := q.firstSegment.remove()
@@ -239,6 +228,27 @@ func (q *DQue) Dequeue() (interface{}, error) {
 	return obj, nil
 }
 
+// Peek returns the first item in the queue without dequeueing it.
+// If the queue is empty, nil and EMPTY are returned
+func (q *DQue) Peek() (interface{}, error) {
+
+	// This is heavy-handed but its safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	// Return the first object from the first segment
+	obj, err := q.firstSegment.peek()
+	if err == emptySegment {
+		return nil, EMPTY
+	}
+	if err != nil {
+		// In reality this will never happen
+		return nil, errors.Wrap(err, "error getting item from the first segment")
+	}
+
+	return obj, nil
+}
+
 // Size returns the number of items in the queue. This number will be accurate
 // only if the itemsPerSegment value has not changed since the queue was last empty.
 func (q *DQue) Size() int {
@@ -250,6 +260,12 @@ func (q *DQue) Size() int {
 	}
 	numSegmentsBetween := (q.lastSegment.number - q.firstSegment.number - 1)
 	return q.firstSegment.size() + (numSegmentsBetween * q.Config.ItemsPerSegment) + q.lastSegment.size()
+}
+
+// SegmentNumbers returns the number of both the first last segmment.
+// There is likely no use for this information other than testing.
+func (q *DQue) SegmentNumbers() (int, int) {
+	return q.firstSegment.number, q.lastSegment.number
 }
 
 // load populates the queue from disk
