@@ -4,8 +4,8 @@ dque is:
 * embedded into your Golang program
 * persistent -- survives program restarts
 * scalable -- not limited by your RAM, but by your disk space
-* FIFO - First in First Out
-* synchronized so it is safe for concurrent usage
+* FIFO -- First In First Out
+* synchronized -- safe for concurrent usage
 
 I love tools that do one thing well.  Hopefully this fits that category.  It frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, so I wrote this to show that it could be done without being dependent on a storage engine that is better suited to other use cases.
 

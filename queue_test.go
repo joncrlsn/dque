@@ -127,8 +127,8 @@ func TestQueue_Add2Remove1(t *testing.T) {
 	}
 }
 
-// Adds 7 and removes 6
-func TestQueue_Add7Remove6(t *testing.T) {
+// Adds 9 and removes 8
+func TestQueue_Add9Remove8(t *testing.T) {
 	qName := "test1"
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error removing queue directory", err)
@@ -137,33 +137,33 @@ func TestQueue_Add7Remove6(t *testing.T) {
 	// Create new queue with segment size 3
 	q := newQ(t, qName)
 
-	// Enqueue 7 items
-	for i := 0; i < 7; i++ {
+	// Enqueue 9 items
+	for i := 0; i < 9; i++ {
 		if err := q.Enqueue(&item2{i}); err != nil {
 			t.Fatal("Error enqueueing", err)
 		}
 	}
 
 	// Check the Size calculation
-	assert(t, 7 == q.Size(), "the size is calculated wrong.  Should be 7")
+	assert(t, 9 == q.Size(), "the size is calculated wrong.  Should be 9")
 
 	firstSegNum, lastSegNum := q.SegmentNumbers()
 
-	// Assert that the first segment is #3
+	// Assert that the first segment is #1
 	assert(t, 1 == firstSegNum, "the first segment is not 1")
 
-	// Assert that the last segment is #3
+	// Assert that the last segment is #4
 	assert(t, 3 == lastSegNum, "the last segment is not 3")
 
-	// Dequeue 6 items
-	for i := 0; i < 6; i++ {
+	// Dequeue 8 items
+	for i := 0; i < 8; i++ {
 		iface, err := q.Dequeue()
 		if err != nil {
 			t.Fatal("Error dequeueing", err)
 		}
 
 		// Check the Size calculation
-		assert(t, 6-i == q.Size(), "the size is calculated wrong.")
+		assert(t, 8-i == q.Size(), "the size is calculated wrong.")
 		item, ok := iface.(item2)
 		if ok {
 			fmt.Printf("Dequeued %T %t %#v\n", item, ok, item)
@@ -180,7 +180,7 @@ func TestQueue_Add7Remove6(t *testing.T) {
 	// Assert that we have only one segment
 	assert(t, firstSegNum == lastSegNum, "The first segment must match the second")
 
-	// Assert that the first segment is #3
+	// Assert that the first segment is #4
 	assert(t, 3 == firstSegNum, "The last segment is not 3")
 
 	// Now reopen the queue and check our assertions again.

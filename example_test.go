@@ -1,7 +1,7 @@
 package dque_test
 
 //
-// Run with run test -
+// Example usage
 //
 
 import (
@@ -23,6 +23,11 @@ func ItemBuilder() interface{} {
 	return &Item{}
 }
 
+func main() {
+	ExampleQueue_main()
+}
+
+// ExampleQueue_main() show how the queue works
 func ExampleQueue_main() {
 	qName := "item-queue"
 	qDir := "/tmp"
@@ -38,7 +43,6 @@ func ExampleQueue_main() {
 	if err := q.Enqueue(&Item{"Joe", 1}); err != nil {
 		log.Fatal("Error enqueueing item ", err)
 	}
-
 	log.Println("Size should be 1:", q.Size())
 
 	// You can reconsitute the queue from disk at any time
@@ -62,7 +66,6 @@ func ExampleQueue_main() {
 			log.Fatal("Error dequeuing item ", err)
 		}
 	}
-
 	log.Println("Size should be zero:", q.Size())
 
 	// Assert type of the response to an Item pointer so we can work with it
@@ -76,8 +79,4 @@ func ExampleQueue_main() {
 
 func doSomething(item *Item) {
 	log.Println("Dequeued", item)
-}
-
-func main() {
-
 }

@@ -143,26 +143,20 @@ func (q *DQue) Enqueue(obj interface{}) error {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
-	if len(q.firstSegment.dirPath) == 0 {
-		// We need to load our state from disk
-		if err := q.load(); err != nil {
-			return errors.Wrap(err, "error loading the queue: "+q.Name)
-		}
-	}
-
-	// Add the object to the last segment
-	if err := q.lastSegment.add(obj); err != nil {
-		return errors.Wrap(err, "error adding item to the last segment")
-	}
-
 	// If this segment is full then create a new one
 	if q.lastSegment.sizeOnDisk() >= q.Config.ItemsPerSegment {
+
 		// We have filled our last segment to capacity, so create a new one
 		seg, err := newQueueSegment(q.fullPath, q.lastSegment.number+1, q.builder)
 		if err != nil {
 			return errors.Wrap(err, "error creating new queue segment: "+strconv.Itoa(q.lastSegment.number+1))
 		}
 		q.lastSegment = seg
+	}
+
+	// Add the object to the last segment
+	if err := q.lastSegment.add(obj); err != nil {
+		return errors.Wrap(err, "error adding item to the last segment")
 	}
 
 	return nil
@@ -195,8 +189,8 @@ func (q *DQue) Dequeue() (interface{}, error) {
 			return obj, errors.Wrap(err, "error deleting queue segment "+q.firstSegment.filePath()+". Queue is in an inconsistent state")
 		}
 
-		// We have only one segment and it's now empty so destroy it
-		// and create a new one
+		// We have only one segment and it's now empty so destroy it and
+		// create a new one.
 		if q.firstSegment.number == q.lastSegment.number {
 
 			// Create the next segment
@@ -210,7 +204,7 @@ func (q *DQue) Dequeue() (interface{}, error) {
 		} else {
 
 			if q.firstSegment.number+1 == q.lastSegment.number {
-				// We are down to a 1 segment queue
+				// We have 2 segments, moving down to 1 shared segment
 				q.firstSegment = q.lastSegment
 			} else {
 
