@@ -77,12 +77,12 @@ func main() {
 
 	var iface interface{}
 
-    // Peek at the first item in the queue without removing it
+	// Peek at the first item in the queue without removing it
 	if iface, err = q.Peek(); err != nil {
 		if err != dque.EMPTY {
 			log.Fatal("Error peeking at item ", err)
 		}
-    }
+	}
 
 	log.Println("Size should still be one:", q.Size())
 
