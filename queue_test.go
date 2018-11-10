@@ -180,7 +180,7 @@ func TestQueue_Add9Remove8(t *testing.T) {
 	// Assert that we have only one segment
 	assert(t, firstSegNum == lastSegNum, "The first segment must match the second")
 
-	// Assert that the first segment is #4
+	// Assert that the first segment is #3
 	assert(t, 3 == firstSegNum, "The last segment is not 3")
 
 	// Now reopen the queue and check our assertions again.
