@@ -6,9 +6,8 @@ dque is:
 * scalable -- not limited by your RAM, but by your disk space
 * FIFO - First in First Out
 * synchronized and safe for concurrent usage
-* as simple and useful as I could make it
 
-I love tools that do one thing well.  This queue shoud fit into that category.  It frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, so I wrote this to show that a simple, fast, persistent, embedded, FIFO queue could be written without being dependent on a storage engine that is better suited to other use cases.
+I love tools that do one thing well.  This queue implementation should fit into that category.  It frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, so I wrote this to show that it could be done without being dependent on a storage engine that is better suited to other use cases.
 
 Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory as well as storing the segment files in between.
 
@@ -76,8 +75,18 @@ func main() {
 		log.Fatal("Error opening existing dque ", err)
 	}
 
-	// Dequeue an item and act on it
 	var iface interface{}
+
+    // Peek at the first item in the queue without removing it
+	if iface, err = q.Peek(); err != nil {
+		if err != dque.EMPTY {
+			log.Fatal("Error peeking at item ", err)
+		}
+    }
+
+	log.Println("Size should still be one:", q.Size())
+
+	// Dequeue an item and act on it
 	if iface, err = q.Dequeue(); err != nil {
 		if err != dque.EMPTY {
 			log.Fatal("Error dequeuing item ", err)
