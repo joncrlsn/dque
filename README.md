@@ -111,6 +111,7 @@ func doSomething(item *dque.Item) {
 
 ### todo?
 * store the segment size in a config file inside the queue. Then it only needs to be specified on dque.New(...)
+* add an EnqueueBatch(...) method that would only sync to disk after the entire batch of objects was written.
 * add Lock() and Unlock() methods so you can peek at the first item and then conditionally dequeue it without worrying that another goroutine has grabbed it out from under you.  The use case is when you don't want to actually remove it from the queue until you know you were able to successfully handle it.
 * add a BlockedDequeue() method that blocks until the queue is no longer empty, then returns the new item.
 
