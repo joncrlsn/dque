@@ -11,7 +11,7 @@ I love tools that do one thing well.  Hopefully this fits that category.  It fru
 
 Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory as well as storing the segment files in between.
 
-The performance is pretty good. On a 3 year old MacBook Pro with SSD, I am able to get around 350 microseconds per enqueue and 400 microseconds per dequeue (for a small struct).
+The performance is good for the vast majority of uses. On a 3 year old MacBook Pro with SSD, I am able to get around 350 microseconds (.35ms) per enqueue and per dequeue (for a small struct).
 
 ### implementation
 * The queue is held in segments of a configurable size. Each segment corresponds with a file on disk. If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.

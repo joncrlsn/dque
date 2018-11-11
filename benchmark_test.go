@@ -43,7 +43,7 @@ func BenchmarkEnqueue(b *testing.B) {
 
 	start := time.Now()
 	for n := 0; n < b.N; n++ {
-		err := q.Enqueue(item3{"Sorta, kind of, a Big Long Name", n, true})
+		err := q.Enqueue(item3{"Short Name", n, true})
 		if err != nil {
 			b.Fatal("Error enqueuing to dque", err)
 		}
@@ -75,7 +75,7 @@ func BenchmarkDequeue(b *testing.B) {
 		b.Fatal("Error creating new dque", err)
 	}
 
-	for i := 0; i < 4000; i++ {
+	for i := 0; i < 6000; i++ {
 		err := q.Enqueue(item3{"Sorta, kind of, a Big Long Name", i, true})
 		if err != nil {
 			b.Fatal("Error enqueuing to dque", err)

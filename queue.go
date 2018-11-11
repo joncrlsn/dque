@@ -236,7 +236,7 @@ func (q *DQue) Peek() (interface{}, error) {
 		return nil, EMPTY
 	}
 	if err != nil {
-		// In reality this will never happen
+		// In reality this will (i.e. should not) never happen
 		return nil, errors.Wrap(err, "error getting item from the first segment")
 	}
 
@@ -268,7 +268,7 @@ func (q *DQue) load() error {
 	// Find all queue files
 	files, err := ioutil.ReadDir(q.fullPath)
 	if err != nil {
-		return errors.Wrap(err, "Unable to read files in "+q.fullPath)
+		return errors.Wrap(err, "unable to read files in "+q.fullPath)
 	}
 
 	// Find the smallest and the largest file numbers
@@ -294,7 +294,7 @@ func (q *DQue) load() error {
 		// We found files
 		seg, err := openQueueSegment(q.fullPath, minNum, q.builder)
 		if err != nil {
-			return errors.Wrap(err, "Unable to create queue segment in "+q.fullPath)
+			return errors.Wrap(err, "unable to create queue segment in "+q.fullPath)
 		}
 		q.firstSegment = seg
 
@@ -306,7 +306,7 @@ func (q *DQue) load() error {
 			// We have multiple segments
 			seg, err = openQueueSegment(q.fullPath, maxNum, q.builder)
 			if err != nil {
-				return errors.Wrap(err, "Unable to create segment for "+q.fullPath)
+				return errors.Wrap(err, "unable to create segment for "+q.fullPath)
 			}
 			q.lastSegment = seg
 		}
@@ -315,7 +315,7 @@ func (q *DQue) load() error {
 		// We found no files so build a new queue starting with segment 1
 		seg, err := newQueueSegment(q.fullPath, 1, q.builder)
 		if err != nil {
-			return errors.Wrap(err, "Unable to create queue segment in "+q.fullPath)
+			return errors.Wrap(err, "unable to create queue segment in "+q.fullPath)
 		}
 
 		// The first and last are the same instance (in this case)
