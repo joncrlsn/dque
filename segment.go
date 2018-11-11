@@ -38,6 +38,7 @@ type qSegment struct {
 	number        int
 	objects       []interface{}
 	objectBuilder func() interface{}
+	file          *os.File
 	mutex         sync.Mutex
 	removeCount   int
 }
@@ -49,20 +50,19 @@ func (seg *qSegment) load() error {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
-	// fmt.Printf("TEMP: Loading segment %d\n", seg.number)
-
 	// Open the file in read mode
-	file, err := os.OpenFile(seg.filePath(), os.O_RDONLY, 0644)
+	var err error
+	seg.file, err = os.OpenFile(seg.filePath(), os.O_RDONLY, 0644)
 	if err != nil {
-		return errors.Wrap(err, "Error opening file: "+seg.filePath())
+		return errors.Wrap(err, "error opening file: "+seg.filePath())
 	}
-	defer file.Close()
+	defer seg.file.Close()
 
 	// Loop until we can load no more
 	for {
 		// Read the 4 byte length of the gob
 		lenBytes := make([]byte, 4)
-		bytesRead, err := file.Read(lenBytes)
+		bytesRead, err := seg.file.Read(lenBytes)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -74,7 +74,7 @@ func (seg *qSegment) load() error {
 			return nil
 		}
 		if bytesRead != 4 {
-			return errors.New("Not enough bytes were read")
+			return errors.New("not enough bytes were read")
 		}
 
 		// Convert the bytes into a 32-bit unsigned int
@@ -90,9 +90,9 @@ func (seg *qSegment) load() error {
 		// Make a byte array the exact size of the gob
 		// Then read the gob into it
 		gobBytes := make([]byte, gobLen)
-		bytesRead, err = file.Read(gobBytes)
+		bytesRead, err = seg.file.Read(gobBytes)
 		if err != nil {
-			return errors.Wrap(err, "Error reading gob bytes")
+			return errors.Wrap(err, "error reading gob bytes")
 		}
 
 		// Decode the bytes into an object
@@ -139,8 +139,6 @@ func (seg *qSegment) remove() (interface{}, error) {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
-	//fmt.Printf("TEMP: Removing from segment %d size %d removed %d\n", seg.number, len(seg.objects), seg.removeCount)
-
 	if len(seg.objects) == 0 {
 		// Queue is empty so return nil object (and empty_segment error)
 		return nil, emptySegment
@@ -151,15 +149,8 @@ func (seg *qSegment) remove() (interface{}, error) {
 	deleteLenBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(deleteLenBytes, uint32(deleteLen))
 
-	// Open or create the file in append mode
-	file, err := os.OpenFile(seg.filePath(), os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, errors.Wrap(err, "Error opening file: "+seg.filePath())
-	}
-	defer file.Close()
-
 	// Write the 4-byte length (of zero) first
-	file.Write(deleteLenBytes)
+	seg.file.Write(deleteLenBytes)
 
 	// Save a reference to the first item in the in-memory queue
 	object := seg.objects[0]
@@ -170,8 +161,10 @@ func (seg *qSegment) remove() (interface{}, error) {
 	// Increment the delete count
 	seg.removeCount++
 
-	//fmt.Printf("TEMP: Removed from segment %d %#v\n", seg.number, object)
+	// Force data to disk
+	seg.file.Sync()
 
+	//fmt.Printf("TEMP: Removed from segment %d %#v\n", seg.number, object)
 	return object, nil
 }
 
@@ -182,15 +175,12 @@ func (seg *qSegment) add(object interface{}) error {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
-	//fmt.Printf("TEMP: Adding to segment %d %#v size %d removed %d\n", seg.number, object, len(seg.objects), seg.removeCount)
-
 	// Encode the struct to a byte buffer
 	var buff bytes.Buffer
 	enc := gob.NewEncoder(&buff)
 	err := enc.Encode(object)
 	if err != nil {
-		//log.Fatalf("enc.Encode() failed with '%s'\n", err.Error())
-		return err
+		return errors.Wrap(err, "error gob encoding object")
 	}
 
 	// Count the bytes stored in the byte buffer
@@ -198,26 +188,19 @@ func (seg *qSegment) add(object interface{}) error {
 	buffLen := len(buff.Bytes())
 	buffLenBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buffLenBytes, uint32(buffLen))
-	//fmt.Println("TEMP: Length of encoded struct is ", buffLen)
-
-	// Create or open the file in append mode
-	file, err := os.OpenFile(seg.filePath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return errors.Wrap(err, "Error opening file: "+seg.filePath())
-	}
-	defer file.Close()
 
 	// Write the 4-byte buffer length first
-	file.Write(buffLenBytes)
+	seg.file.Write(buffLenBytes)
 
 	// Then write the buffer bytes
-	file.Write(buff.Bytes())
+	seg.file.Write(buff.Bytes())
 
 	seg.objects = append(seg.objects, object)
 
-	// Brag about it
-	//fmt.Printf("TEMP: Added: %#v\n", object)
+	// Force data to disk
+	seg.file.Sync()
 
+	//fmt.Printf("TEMP: Added: %#v\n", object)
 	return nil
 }
 
@@ -251,16 +234,18 @@ func (seg *qSegment) delete() error {
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
+	if err := seg.file.Close(); err != nil {
+		return errors.Wrap(err, "unable to close the segment file before deleting")
+	}
+
 	// Delete the storage for this queue
 	err := os.Remove(seg.filePath())
 	if err != nil {
-		return errors.Wrap(err, "Error deleting file: "+seg.filePath())
+		return errors.Wrap(err, "error deleting file: "+seg.filePath())
 	}
 
 	// Empty the in-memory slice of objects
 	seg.objects = seg.objects[:0]
-
-	//fmt.Printf("Deleted: %s\n", seg.filePath())
 
 	return nil
 }
@@ -286,6 +271,14 @@ func newQueueSegment(dirPath string, number int, builder func() interface{}) (*q
 		return nil, errors.New("file already exists: " + seg.filePath())
 	}
 
+	// Create the file in append mode
+	var err error
+	seg.file, err = os.OpenFile(seg.filePath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating file: "+seg.filePath())
+	}
+	// Leave the file open for future writes
+
 	return &seg, nil
 }
 
@@ -304,7 +297,16 @@ func openQueueSegment(dirPath string, number int, builder func() interface{}) (*
 
 	// Load the items into memory
 	if err := seg.load(); err != nil {
-		return nil, errors.Wrap(err, "Unable to load queue segment in "+dirPath)
+		return nil, errors.Wrap(err, "unable to load queue segment in "+dirPath)
 	}
+
+	// Open the file in append mode
+	var err error
+	seg.file, err = os.OpenFile(seg.filePath(), os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, errors.Wrap(err, "error opening file: "+seg.filePath())
+	}
+	// Leave the file open for future writes
+
 	return &seg, nil
 }
