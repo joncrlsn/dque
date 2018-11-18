@@ -1,6 +1,10 @@
 // segement_test.go
 package dque
 
+//
+// White box texting of the aSegment struct and methods.
+//
+
 import (
 	"fmt"
 	"os"
@@ -29,7 +33,7 @@ func TestSegment(t *testing.T) {
 	}
 
 	// Create a new segment of the queue
-	seg, err := newQueueSegment(testDir, 1, item1Builder)
+	seg, err := newQueueSegment(testDir, 1, false, item1Builder)
 	if err != nil {
 		t.Fatalf("newQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
 	}
@@ -55,7 +59,7 @@ func TestSegment(t *testing.T) {
 	assert(t, 1 == seg.size(), "Expected size of 1")
 
 	// Recreate the segment from disk
-	seg, err = openQueueSegment(testDir, 1, item1Builder)
+	seg, err = openQueueSegment(testDir, 1, false, item1Builder)
 	if err != nil {
 		t.Fatalf("openQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
 	}
@@ -84,7 +88,7 @@ func TestSegment_Open(t *testing.T) {
 		t.Fatalf("Error creating directory from the TestSegment method: %s\n", err)
 	}
 
-	seg, err := openQueueSegment(testDir, 1, item1Builder)
+	seg, err := openQueueSegment(testDir, 1, false, item1Builder)
 	if err == nil {
 		t.Fatalf("openQueueSegment('%s') should have failed\n", testDir)
 	}

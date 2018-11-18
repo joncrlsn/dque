@@ -23,7 +23,14 @@ func item3Builder() interface{} {
 	return &item3{}
 }
 
-func BenchmarkEnqueue(b *testing.B) {
+func BenchmarkEnqueue_Safe(b *testing.B) {
+	benchmarkEnqueue(b, false /* true=turbo */)
+}
+func BenchmarkEnqueue_Turbo(b *testing.B) {
+	benchmarkEnqueue(b, true /* true=turbo */)
+}
+
+func benchmarkEnqueue(b *testing.B, turbo bool) {
 
 	qName := "testBenchEnqueue"
 
@@ -31,13 +38,16 @@ func BenchmarkEnqueue(b *testing.B) {
 
 	// Clean up from a previous run
 	if err := os.RemoveAll(qName); err != nil {
-		b.Fatal("Error removing queue directory", err)
+		b.Fatal("Error removing queue directory:", err)
 	}
 
 	// Create the queue
 	q, err := dque.New(qName, ".", 100, item3Builder)
 	if err != nil {
-		b.Fatal("Error creating new dque", err)
+		b.Fatal("Error creating new dque:", err)
+	}
+	if turbo {
+		q.TurboOn()
 	}
 	b.StartTimer()
 
@@ -45,7 +55,7 @@ func BenchmarkEnqueue(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		err := q.Enqueue(item3{"Short Name", n, true})
 		if err != nil {
-			b.Fatal("Error enqueuing to dque", err)
+			b.Fatal("Error enqueuing to dque:", err)
 		}
 	}
 
@@ -54,11 +64,18 @@ func BenchmarkEnqueue(b *testing.B) {
 
 	// Clean up from the run
 	if err := os.RemoveAll(qName); err != nil {
-		b.Fatal("Error removing queue directory for BenchmarkDequeue", err)
+		b.Fatal("Error removing queue directory for BenchmarkDequeue:", err)
 	}
 }
 
-func BenchmarkDequeue(b *testing.B) {
+func BenchmarkDequeue_Safe(b *testing.B) {
+	benchmarkDequeue(b, false /* true=turbo */)
+}
+func BenchmarkDequeue_Turbo(b *testing.B) {
+	benchmarkDequeue(b, true /* true=turbo */)
+}
+
+func benchmarkDequeue(b *testing.B, turbo bool) {
 
 	qName := "testBenchDequeue"
 
@@ -66,7 +83,7 @@ func BenchmarkDequeue(b *testing.B) {
 
 	// Clean up from a previous run
 	if err := os.RemoveAll(qName); err != nil {
-		b.Fatal("Error removing queue directory", err)
+		b.Fatal("Error removing queue directory:", err)
 	}
 
 	// Create the queue
@@ -74,11 +91,16 @@ func BenchmarkDequeue(b *testing.B) {
 	if err != nil {
 		b.Fatal("Error creating new dque", err)
 	}
+	var iterations int = 3000
+	if turbo {
+		q.TurboOn()
+		iterations = iterations * 10
+	}
 
-	for i := 0; i < 6000; i++ {
+	for i := 0; i < iterations; i++ {
 		err := q.Enqueue(item3{"Sorta, kind of, a Big Long Name", i, true})
 		if err != nil {
-			b.Fatal("Error enqueuing to dque", err)
+			b.Fatal("Error enqueuing to dque:", err)
 		}
 	}
 	b.StartTimer()
@@ -87,7 +109,7 @@ func BenchmarkDequeue(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		_, err := q.Dequeue()
 		if err != nil {
-			b.Fatal("Error dequeuing from dque", err)
+			b.Fatal("Error dequeuing from dque:", err)
 		}
 	}
 

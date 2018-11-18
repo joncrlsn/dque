@@ -55,8 +55,10 @@ type DQue struct {
 	fullPath     string
 	firstSegment *qSegment
 	lastSegment  *qSegment
-	mutex        sync.Mutex
 	builder      func() interface{} // builds a structure to load via gob
+
+	mutex sync.Mutex
+	turbo bool
 }
 
 // New creats a new durable queue
@@ -147,7 +149,7 @@ func (q *DQue) Enqueue(obj interface{}) error {
 	if q.lastSegment.sizeOnDisk() >= q.Config.ItemsPerSegment {
 
 		// We have filled our last segment to capacity, so create a new one
-		seg, err := newQueueSegment(q.fullPath, q.lastSegment.number+1, q.builder)
+		seg, err := newQueueSegment(q.fullPath, q.lastSegment.number+1, q.turbo, q.builder)
 		if err != nil {
 			return errors.Wrap(err, "error creating new queue segment: "+strconv.Itoa(q.lastSegment.number+1))
 		}
@@ -194,7 +196,7 @@ func (q *DQue) Dequeue() (interface{}, error) {
 		if q.firstSegment.number == q.lastSegment.number {
 
 			// Create the next segment
-			seg, err := newQueueSegment(q.fullPath, q.firstSegment.number+1, q.builder)
+			seg, err := newQueueSegment(q.fullPath, q.firstSegment.number+1, q.turbo, q.builder)
 			if err != nil {
 				return obj, errors.Wrap(err, "error creating new segment. Queue is in an inconsistent state")
 			}
@@ -209,7 +211,7 @@ func (q *DQue) Dequeue() (interface{}, error) {
 			} else {
 
 				// Open the next segment
-				seg, err := openQueueSegment(q.fullPath, q.firstSegment.number+1, q.builder)
+				seg, err := openQueueSegment(q.fullPath, q.firstSegment.number+1, q.turbo, q.builder)
 				if err != nil {
 					return obj, errors.Wrap(err, "error creating new segment. Queue is in an inconsistent state")
 				}
@@ -262,6 +264,58 @@ func (q *DQue) SegmentNumbers() (int, int) {
 	return q.firstSegment.number, q.lastSegment.number
 }
 
+// Turbo returns true if the turbo flag is on.  Having turbo on speeds things
+// up significantly.
+func (q *DQue) Turbo() bool {
+	return q.turbo
+}
+
+// TurboOn allows the filesystem to decide when to sync file changes to disk.
+// Throughput is greatly increased by turning turbo on, however there is some
+// risk of losing data if a power-loss occurs.
+// If turbo is already on an error is returned
+func (q *DQue) TurboOn() error {
+	if q.turbo {
+		return errors.New("DQue.TurboOn() is not valid when turbo is on.")
+	}
+	q.turbo = true
+	q.firstSegment.turboOn()
+	q.lastSegment.turboOn()
+	return nil
+}
+
+// turboOff re-enables the "safety" mode that syncs every file change to disk as
+// they happen.
+// If turbo is already off an error is returned
+func (q *DQue) TurboOff() error {
+	if !q.turbo {
+		return errors.New("DQue.TurboOff() is not valid when turbo is off.")
+	}
+	if err := q.firstSegment.turboOff(); err != nil {
+		return err
+	}
+	if err := q.lastSegment.turboOff(); err != nil {
+		return err
+	}
+	q.turbo = false
+	return nil
+}
+
+// TurboSync allows you to fsync changes to disk, but only if turbo is on.
+// If turbo is off an error is returned
+func (q *DQue) TurboSync() error {
+	if !q.turbo {
+		return errors.New("DQue.TurboSync() is inappropriate when turbo is off.")
+	}
+	if err := q.firstSegment.turboSync(); err != nil {
+		return errors.Wrap(err, "unable to sync changes to disk.")
+	}
+	if err := q.lastSegment.turboSync(); err != nil {
+		return errors.Wrap(err, "unable to sync changes to disk.")
+	}
+	return nil
+}
+
 // load populates the queue from disk
 func (q *DQue) load() error {
 
@@ -292,7 +346,7 @@ func (q *DQue) load() error {
 	if maxNum > 0 {
 
 		// We found files
-		seg, err := openQueueSegment(q.fullPath, minNum, q.builder)
+		seg, err := openQueueSegment(q.fullPath, minNum, q.turbo, q.builder)
 		if err != nil {
 			return errors.Wrap(err, "unable to create queue segment in "+q.fullPath)
 		}
@@ -304,7 +358,7 @@ func (q *DQue) load() error {
 			q.lastSegment = q.firstSegment
 		} else {
 			// We have multiple segments
-			seg, err = openQueueSegment(q.fullPath, maxNum, q.builder)
+			seg, err = openQueueSegment(q.fullPath, maxNum, q.turbo, q.builder)
 			if err != nil {
 				return errors.Wrap(err, "unable to create segment for "+q.fullPath)
 			}
@@ -313,7 +367,7 @@ func (q *DQue) load() error {
 
 	} else {
 		// We found no files so build a new queue starting with segment 1
-		seg, err := newQueueSegment(q.fullPath, 1, q.builder)
+		seg, err := newQueueSegment(q.fullPath, 1, q.turbo, q.builder)
 		if err != nil {
 			return errors.Wrap(err, "unable to create queue segment in "+q.fullPath)
 		}

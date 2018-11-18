@@ -6,25 +6,30 @@ dque is:
 * scalable -- not limited by your RAM, but by your disk space
 * FIFO -- First In First Out
 * synchronized -- safe for concurrent usage
+* no external dependencies
 
-I love tools that do one thing well.  Hopefully this fits that category.  It frustrated me that the only embedded persistent queues I could find for Go were wrappers around key value stores, so I wrote this to show that it could be done without being dependent on a storage engine that is better suited to other use cases.
+I love tools that do one thing well.  Hopefully this fits that category.
 
 Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory as well as storing the segment files in between.
 
-The performance is good for the vast majority of uses. On a 3 year old MacBook Pro with SSD, I am able to get around 350 microseconds (.35ms) per enqueue and per dequeue (for a small struct).
+### performance
+There are two performance modes: Safe (default) and Turbo.  Safe mode forces an fsync to disk every time you enqueue or dequeue an item.  Turbo mode lets the OS decide when to sync your changes to disk, which means it is a lot faster.  There is a risk with Turbo mode that a power failure could corrupt a queue file.  By turning on Turbo mode you accept that risk.  Run the benchmark to see the difference on your hardware.
 
 ### implementation
-* The queue is held in segments of a configurable size. Each segment corresponds with a file on disk. If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.
-* Because the encoding/gob package is used to store the struct to disk: 
+* The queue is held in segments of a configurable size. 
+* Each segment corresponds with a file on disk. 
+* If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.
+* Segment files are only appended to and then eventually deleted.  They are never modified (other than being appended to).
+* Because the encoding/gob package is used to store the struct to disk:
   * Only structs can be stored in the queue.
   * Only one type of struct can be stored in each queue.
   * Only public fields in a struct will be stored.
-  * You must provide a function that returns a pointer to a new struct of the type stored in the queue.  This function is used when loading segments into memory from disk.  If you can think of a better way to handle this, I'd love to hear it.
+  * A function is required that returns a pointer to a new struct of the type stored in the queue.  This function is used when loading segments into memory from disk.  I'd love to find a way to avoid this function.
 * Queue segment implementation:
   * For nice visuals, see [Gabor Cselle's documentation here](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  Note that Gabor's implementation kept the entire queue in memory as well as disk.  dque keeps only the head and tail segments in memory.
   * Enqueueing an item adds it both to the end of the last segment file and to the in-memory item slice for that segment.
   * When a segment reaches its maximum size a new segment is created.
-  * Dequeueing an item removes it from the beginning of the in-memory slice and appends a "delete" marker to the end of the segment file.  This allows the item to be left in the file until the number of delete markers matches the number of items, at which point the entire file is deleted.
+  * Dequeueing an item removes it from the beginning of the in-memory slice and appends a 4-byte "delete" marker to the end of the segment file.  This allows the item to be left in the file until the number of delete markers matches the number of items, at which point the entire file is deleted.
   * When a segment is reconstituted from disk, each "delete" marker found in the file causes a removal of the first element of the in-memory slice.
   * When each item in the segment has been dequeued, the segment file is deleted and the next segment is loaded into memory.
 
@@ -111,7 +116,6 @@ func doSomething(item *dque.Item) {
 
 ### todo?
 * store the segment size in a config file inside the queue. Then it only needs to be specified on dque.New(...)
-* add an EnqueueBatch(...) method that would only sync to disk after the entire batch of objects was written.
 * add Lock() and Unlock() methods so you can peek at the first item and then conditionally dequeue it without worrying that another goroutine has grabbed it out from under you.  The use case is when you don't want to actually remove it from the queue until you know you were able to successfully handle it.
 * add a BlockedDequeue() method that blocks until the queue is no longer empty, then returns the new item.
 

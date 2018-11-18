@@ -32,7 +32,7 @@ var (
 	emptySegment = errors.New("Segment is empty")
 )
 
-// qSegment is the portion of a persistent queue
+// qSegment represents a portion (segment) of a persistent queue
 type qSegment struct {
 	dirPath       string
 	number        int
@@ -41,6 +41,8 @@ type qSegment struct {
 	file          *os.File
 	mutex         sync.Mutex
 	removeCount   int
+	turbo         bool
+	maybeDirty    bool // filesystem changes may not have been flushed to disk
 }
 
 // load reads all objects from the queue file into a slice
@@ -161,10 +163,11 @@ func (seg *qSegment) remove() (interface{}, error) {
 	// Increment the delete count
 	seg.removeCount++
 
-	// Force data to disk
-	seg.file.Sync()
+	// Possibly force writes to disk
+	if err := seg._sync(); err != nil {
+		return nil, err
+	}
 
-	//fmt.Printf("TEMP: Removed from segment %d %#v\n", seg.number, object)
 	return object, nil
 }
 
@@ -197,10 +200,11 @@ func (seg *qSegment) add(object interface{}) error {
 
 	seg.objects = append(seg.objects, object)
 
-	// Force data to disk
-	seg.file.Sync()
+	// Possibly force writes to disk
+	if err := seg._sync(); err != nil {
+		return err
+	}
 
-	//fmt.Printf("TEMP: Added: %#v\n", object)
 	return nil
 }
 
@@ -215,9 +219,10 @@ func (seg *qSegment) size() int {
 	return len(seg.objects)
 }
 
-// sizeOnDisk returns the number of objects in memory plus removed objects.
-// This number is used to keep my file from growing forever when items are
-// removed as fast as they are added.
+// sizeOnDisk returns the number of objects in memory plus removed objects. This
+// number will match the number of objects still on disk.
+// This number is used to keep the file from growing forever when items are
+// removed about as fast as they are added.
 func (seg *qSegment) sizeOnDisk() int {
 
 	// This is heavy-handed but its safe
@@ -247,6 +252,8 @@ func (seg *qSegment) delete() error {
 	// Empty the in-memory slice of objects
 	seg.objects = seg.objects[:0]
 
+	seg.file = nil
+
 	return nil
 }
 
@@ -258,10 +265,60 @@ func (seg *qSegment) filePath() string {
 	return path.Join(seg.dirPath, seg.fileName())
 }
 
-// newQueueSegment creates a new, persistent  segment of the queue
-func newQueueSegment(dirPath string, number int, builder func() interface{}) (*qSegment, error) {
+// turboOn allows the filesystem to decide when to sync file changes to disk
+// Speed is be greatly increased by turning turbo on, however there is some
+// risk of losing data should a power-loss occur.
+func (seg *qSegment) turboOn() {
+	seg.turbo = true
+}
 
-	seg := qSegment{dirPath: dirPath, number: number, objectBuilder: builder}
+// turboOff re-enables the "safety" mode that syncs every file change to disk as
+// they happen.
+func (seg *qSegment) turboOff() error {
+	if err := seg.turboSync(); err != nil {
+		return err
+	}
+	seg.turbo = false
+	return nil
+}
+
+// turboSync does an fsync to disk if turbo is on.
+func (seg *qSegment) turboSync() error {
+	if !seg.turbo {
+		// When the first and last segments are the same, this method
+		// will be called twice.
+		return nil
+	}
+	if seg.maybeDirty {
+		if err := seg.file.Sync(); err != nil {
+			return errors.Wrap(err, "unable to sync file changes.")
+		}
+		seg.maybeDirty = false
+	}
+	return nil
+}
+
+// _sync must only be called by the add and remove methods on qSegment.
+// Only syncs if turbo is off
+func (seg *qSegment) _sync() error {
+	if seg.turbo {
+		// We do *not* force a sync if turbo is on
+		// We just mark it maybe Dirty
+		seg.maybeDirty = true
+		return nil
+	}
+
+	if err := seg.file.Sync(); err != nil {
+		return errors.Wrap(err, "unable to sync file changes in _sync method.")
+	}
+	seg.maybeDirty = false
+	return nil
+}
+
+// newQueueSegment creates a new, persistent  segment of the queue
+func newQueueSegment(dirPath string, number int, turbo bool, builder func() interface{}) (*qSegment, error) {
+
+	seg := qSegment{dirPath: dirPath, number: number, turbo: turbo, objectBuilder: builder}
 
 	if !dirExists(seg.dirPath) {
 		return nil, errors.New("dirPath is not a valid directory: " + seg.dirPath)
@@ -283,9 +340,9 @@ func newQueueSegment(dirPath string, number int, builder func() interface{}) (*q
 }
 
 // openQueueSegment reads an existing persistent segment of the queue into memory
-func openQueueSegment(dirPath string, number int, builder func() interface{}) (*qSegment, error) {
+func openQueueSegment(dirPath string, number int, turbo bool, builder func() interface{}) (*qSegment, error) {
 
-	seg := qSegment{dirPath: dirPath, number: number, objectBuilder: builder}
+	seg := qSegment{dirPath: dirPath, number: number, turbo: turbo, objectBuilder: builder}
 
 	if !dirExists(seg.dirPath) {
 		return nil, errors.New("dirPath is not a valid directory: " + seg.dirPath)
@@ -300,7 +357,7 @@ func openQueueSegment(dirPath string, number int, builder func() interface{}) (*
 		return nil, errors.Wrap(err, "unable to load queue segment in "+dirPath)
 	}
 
-	// Open the file in append mode
+	// Re-open the file in append mode
 	var err error
 	seg.file, err = os.OpenFile(seg.filePath(), os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
