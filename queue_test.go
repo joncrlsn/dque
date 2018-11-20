@@ -128,7 +128,10 @@ func testQueue_Add2Remove1(t *testing.T, turbo bool) {
 
 	// Test Peek to make sure the size doesn't change
 	assert(t, 2 == q.Size(), "Queue size is not 2 before peeking")
-	obj, err := q.Peek()
+	if _, err := q.Peek(); err != nil {
+		t.Fatal("Error peeking at first item in the queue", err)
+	}
+
 	assert(t, 2 == q.Size(), "Queue size is not 2 after peeking")
 	assert(t, obj != nil, "Object is nil")
 

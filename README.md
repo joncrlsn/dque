@@ -1,4 +1,6 @@
-# dque - simple embedded durable queue for Go
+[![Go Report Card](https://goreportcard.com/badge/github.com/joncrlsn/dque)](https://goreportcard.com/report/github.com/joncrlsn/dque)
+
+# dque - a fast embedded durable queue for Go
 
 dque is:
 * embedded into your Golang program

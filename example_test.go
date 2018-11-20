@@ -59,6 +59,7 @@ func ExampleDQue_main() {
 			log.Fatal("Error peeking at item ", err)
 		}
 	}
+	log.Println("Peeked at:", iface)
 
 	// Dequeue the next item in the queue
 	if iface, err = q.Dequeue(); err != nil {
@@ -66,6 +67,7 @@ func ExampleDQue_main() {
 			log.Fatal("Error dequeuing item ", err)
 		}
 	}
+	log.Println("Dequeued:", iface)
 	log.Println("Size should be zero:", q.Size())
 
 	// Assert type of the response to an Item pointer so we can work with it

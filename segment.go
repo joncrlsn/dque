@@ -93,7 +93,7 @@ func (seg *qSegment) load() error {
 		// Make a byte array the exact size of the gob
 		// Then read the gob into it
 		gobBytes := make([]byte, gobLen)
-		bytesRead, err = seg.file.Read(gobBytes)
+		_, err = seg.file.Read(gobBytes)
 		if err != nil {
 			return errors.Wrap(err, "error reading gob bytes")
 		}
