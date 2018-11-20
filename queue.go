@@ -1,12 +1,12 @@
 //
-// Copyright (c) 2018 Jon Carlson.  All rights reserved.
-// Use of this source code is governed by an MIT-style
-// license that can be found in the LICENSE file.
+// Package dque is fast, embedded, persistent FIFO queue for Go using gob encoding.
 //
 package dque
 
 //
-// A scalable, embedded, persistent FIFO queue implementation using gob encoding.
+// Copyright (c) 2018 Jon Carlson.  All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
 //
 
 // Test Cases:
@@ -36,21 +36,27 @@ import (
 
 var (
 	filePattern *regexp.Regexp
-	EMPTY       error = errors.New("dque is empty")
+
+	// ErrEmpty is returned when attempting to dequeue from an empty queue.
+	ErrEmpty = errors.New("dque is empty")
 )
 
 func init() {
 	filePattern, _ = regexp.Compile("^([0-9]+)\\.dque$")
 }
 
-type Config struct {
+type config struct {
 	ItemsPerSegment int
 }
 
+// DQue is the in-memory representation of a queue on disk.  You must never have
+// two *active* DQue instances pointing at the same path on disk.  It is
+// acceptable to reconstitute a new instance from disk, but make sure the old
+// instance is never enqueued to (or dequeued from) again.
 type DQue struct {
 	Name    string
 	DirPath string
-	Config  Config
+	config  config
 
 	fullPath     string
 	firstSegment *qSegment
@@ -66,17 +72,17 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 
 	// Validation
 	if len(name) == 0 {
-		return nil, errors.New("the queue name requires a value.")
+		return nil, errors.New("the queue name requires a value")
 	}
 	if len(dirPath) == 0 {
-		return nil, errors.New("the queue directory requires a value.")
+		return nil, errors.New("the queue directory requires a value")
 	}
 	if !dirExists(dirPath) {
 		return nil, errors.New("the given queue directory is not valid: " + dirPath)
 	}
 	fullPath := path.Join(dirPath, name)
 	if dirExists(fullPath) {
-		return nil, errors.New("the given queue directory already exists: " + fullPath + ". Use Open instead.")
+		return nil, errors.New("the given queue directory already exists: " + fullPath + ". Use Open instead")
 	}
 
 	if err := os.Mkdir(fullPath, 0755); err != nil {
@@ -85,7 +91,7 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 
 	q := DQue{Name: name, DirPath: dirPath}
 	q.fullPath = fullPath
-	q.Config.ItemsPerSegment = itemsPerSegment
+	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
 	q.load()
 	return &q, nil
@@ -96,10 +102,10 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 
 	// Validation
 	if len(name) == 0 {
-		return nil, errors.New("the queue name requires a value.")
+		return nil, errors.New("the queue name requires a value")
 	}
 	if len(dirPath) == 0 {
-		return nil, errors.New("the queue directory requires a value.")
+		return nil, errors.New("the queue directory requires a value")
 	}
 	if !dirExists(dirPath) {
 		return nil, errors.New("the given queue directory is not valid (" + dirPath + ")")
@@ -111,7 +117,7 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 
 	q := DQue{Name: name, DirPath: dirPath}
 	q.fullPath = fullPath
-	q.Config.ItemsPerSegment = itemsPerSegment
+	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
 	q.load()
 	return &q, nil
@@ -122,10 +128,10 @@ func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() 
 
 	// Validation
 	if len(name) == 0 {
-		return nil, errors.New("the queue name requires a value.")
+		return nil, errors.New("the queue name requires a value")
 	}
 	if len(dirPath) == 0 {
-		return nil, errors.New("the queue directory requires a value.")
+		return nil, errors.New("the queue directory requires a value")
 	}
 	if !dirExists(dirPath) {
 		return nil, errors.New("the given queue directory is not valid (" + dirPath + ")")
@@ -146,7 +152,7 @@ func (q *DQue) Enqueue(obj interface{}) error {
 	defer q.mutex.Unlock()
 
 	// If this segment is full then create a new one
-	if q.lastSegment.sizeOnDisk() >= q.Config.ItemsPerSegment {
+	if q.lastSegment.sizeOnDisk() >= q.config.ItemsPerSegment {
 
 		// We have filled our last segment to capacity, so create a new one
 		seg, err := newQueueSegment(q.fullPath, q.lastSegment.number+1, q.turbo, q.builder)
@@ -174,8 +180,8 @@ func (q *DQue) Dequeue() (interface{}, error) {
 
 	// Remove the first object from the first segment
 	obj, err := q.firstSegment.remove()
-	if err == emptySegment {
-		return nil, EMPTY
+	if err == errEmptySegment {
+		return nil, ErrEmpty
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "error removing item from the first segment")
@@ -184,7 +190,7 @@ func (q *DQue) Dequeue() (interface{}, error) {
 	// If this segment is empty and we've reached the max for this segment
 	// then delete the file and open the next one.
 	if q.firstSegment.size() == 0 &&
-		q.firstSegment.sizeOnDisk() >= q.Config.ItemsPerSegment {
+		q.firstSegment.sizeOnDisk() >= q.config.ItemsPerSegment {
 
 		// Delete the segment file
 		if err := q.firstSegment.delete(); err != nil {
@@ -234,8 +240,8 @@ func (q *DQue) Peek() (interface{}, error) {
 
 	// Return the first object from the first segment
 	obj, err := q.firstSegment.peek()
-	if err == emptySegment {
-		return nil, EMPTY
+	if err == errEmptySegment {
+		return nil, ErrEmpty
 	}
 	if err != nil {
 		// In reality this will (i.e. should not) never happen
@@ -255,7 +261,7 @@ func (q *DQue) Size() int {
 		return q.firstSegment.size() + q.lastSegment.size()
 	}
 	numSegmentsBetween := (q.lastSegment.number - q.firstSegment.number - 1)
-	return q.firstSegment.size() + (numSegmentsBetween * q.Config.ItemsPerSegment) + q.lastSegment.size()
+	return q.firstSegment.size() + (numSegmentsBetween * q.config.ItemsPerSegment) + q.lastSegment.size()
 }
 
 // SegmentNumbers returns the number of both the first last segmment.
@@ -276,7 +282,7 @@ func (q *DQue) Turbo() bool {
 // If turbo is already on an error is returned
 func (q *DQue) TurboOn() error {
 	if q.turbo {
-		return errors.New("DQue.TurboOn() is not valid when turbo is on.")
+		return errors.New("DQue.TurboOn() is not valid when turbo is on")
 	}
 	q.turbo = true
 	q.firstSegment.turboOn()
@@ -284,12 +290,12 @@ func (q *DQue) TurboOn() error {
 	return nil
 }
 
-// turboOff re-enables the "safety" mode that syncs every file change to disk as
+// TurboOff re-enables the "safety" mode that syncs every file change to disk as
 // they happen.
 // If turbo is already off an error is returned
 func (q *DQue) TurboOff() error {
 	if !q.turbo {
-		return errors.New("DQue.TurboOff() is not valid when turbo is off.")
+		return errors.New("DQue.TurboOff() is not valid when turbo is off")
 	}
 	if err := q.firstSegment.turboOff(); err != nil {
 		return err
@@ -305,13 +311,13 @@ func (q *DQue) TurboOff() error {
 // If turbo is off an error is returned
 func (q *DQue) TurboSync() error {
 	if !q.turbo {
-		return errors.New("DQue.TurboSync() is inappropriate when turbo is off.")
+		return errors.New("DQue.TurboSync() is inappropriate when turbo is off")
 	}
 	if err := q.firstSegment.turboSync(); err != nil {
-		return errors.Wrap(err, "unable to sync changes to disk.")
+		return errors.Wrap(err, "unable to sync changes to disk")
 	}
 	if err := q.lastSegment.turboSync(); err != nil {
-		return errors.Wrap(err, "unable to sync changes to disk.")
+		return errors.Wrap(err, "unable to sync changes to disk")
 	}
 	return nil
 }

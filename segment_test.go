@@ -68,7 +68,7 @@ func TestSegment(t *testing.T) {
 	for {
 		_, err := seg.remove()
 		if err != nil {
-			if err == emptySegment {
+			if err == errEmptySegment {
 				break
 			}
 			t.Fatalf("Remove() failed with '%s'\n", err.Error())

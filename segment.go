@@ -1,14 +1,15 @@
+package dque
+
 //
 // Copyright (c) 2018 Jon Carlson.  All rights reserved.
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 //
-package dque
 
 //
 // This is a segment of a memory-efficient FIFO durable queue.  Items in the queue must be of the same type.
 //
-// Each queue segment corresponds to a file on disk.
+// Each qSegment instance corresponds to a file on disk.
 //
 // This segment is both persistent and in-memory so there is a memory limit to the size
 // (which is why it is just a segment instead of being used for the entire queue).
@@ -29,7 +30,7 @@ import (
 )
 
 var (
-	emptySegment = errors.New("Segment is empty")
+	errEmptySegment = errors.New("Segment is empty")
 )
 
 // qSegment represents a portion (segment) of a persistent queue
@@ -123,7 +124,7 @@ func (seg *qSegment) peek() (interface{}, error) {
 
 	if len(seg.objects) == 0 {
 		// Queue is empty so return nil object (and emptySegment error)
-		return nil, emptySegment
+		return nil, errEmptySegment
 	}
 
 	// Save a reference to the first item in the in-memory queue
@@ -143,7 +144,7 @@ func (seg *qSegment) remove() (interface{}, error) {
 
 	if len(seg.objects) == 0 {
 		// Queue is empty so return nil object (and empty_segment error)
-		return nil, emptySegment
+		return nil, errEmptySegment
 	}
 
 	// Create a 4-byte length of value zero (this signifies a removal)
@@ -275,6 +276,11 @@ func (seg *qSegment) turboOn() {
 // turboOff re-enables the "safety" mode that syncs every file change to disk as
 // they happen.
 func (seg *qSegment) turboOff() error {
+	if !seg.turbo {
+		// turboOff is know to be called twice when the first and last ssegments
+		// are the same.
+		return nil
+	}
 	if err := seg.turboSync(); err != nil {
 		return err
 	}

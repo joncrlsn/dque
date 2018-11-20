@@ -24,11 +24,11 @@ func ItemBuilder() interface{} {
 }
 
 func main() {
-	ExampleQueue_main()
+	ExampleDQue_main()
 }
 
 // ExampleQueue_main() show how the queue works
-func ExampleQueue_main() {
+func ExampleDQue_main() {
 	qName := "item-queue"
 	qDir := "/tmp"
 	segmentSize := 50
@@ -55,14 +55,14 @@ func ExampleQueue_main() {
 	// Peek at the next item in the queue
 	var iface interface{}
 	if iface, err = q.Peek(); err != nil {
-		if err != dque.EMPTY {
+		if err != dque.ErrEmpty {
 			log.Fatal("Error peeking at item ", err)
 		}
 	}
 
 	// Dequeue the next item in the queue
 	if iface, err = q.Dequeue(); err != nil {
-		if err != dque.EMPTY {
+		if err != dque.ErrEmpty {
 			log.Fatal("Error dequeuing item ", err)
 		}
 	}

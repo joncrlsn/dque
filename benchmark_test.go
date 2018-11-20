@@ -2,10 +2,8 @@
 package dque_test
 
 import (
-	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/joncrlsn/dque"
 )
@@ -51,16 +49,12 @@ func benchmarkEnqueue(b *testing.B, turbo bool) {
 	}
 	b.StartTimer()
 
-	start := time.Now()
 	for n := 0; n < b.N; n++ {
 		err := q.Enqueue(item3{"Short Name", n, true})
 		if err != nil {
 			b.Fatal("Error enqueuing to dque:", err)
 		}
 	}
-
-	elapsed := time.Now().Sub(start)
-	fmt.Printf("Elapsed time to enqueue %d items: %v\n", b.N, elapsed)
 
 	// Clean up from the run
 	if err := os.RemoveAll(qName); err != nil {
@@ -91,7 +85,7 @@ func benchmarkDequeue(b *testing.B, turbo bool) {
 	if err != nil {
 		b.Fatal("Error creating new dque", err)
 	}
-	var iterations int = 3000
+	var iterations int = 5000
 	if turbo {
 		q.TurboOn()
 		iterations = iterations * 10
@@ -105,16 +99,12 @@ func benchmarkDequeue(b *testing.B, turbo bool) {
 	}
 	b.StartTimer()
 
-	start := time.Now()
 	for n := 0; n < b.N; n++ {
 		_, err := q.Dequeue()
 		if err != nil {
 			b.Fatal("Error dequeuing from dque:", err)
 		}
 	}
-
-	elapsed := time.Now().Sub(start)
-	fmt.Printf("Elapsed time to dequeue %d items: %v\n", b.N, elapsed)
 
 	// Clean up from the run
 	if err := os.RemoveAll(qName); err != nil {
