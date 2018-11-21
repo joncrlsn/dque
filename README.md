@@ -1,6 +1,9 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/joncrlsn/dque)](https://goreportcard.com/report/github.com/joncrlsn/dque)
 
 # dque - a fast embedded durable queue for Go
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/joncrlsn/dque)](https://goreportcard.com/report/github.com/joncrlsn/dque)
+[![GoDoc](https://godoc.org/github.com/joncrlsn/dque?status.svg)](https://godoc.org/github.com/joncrlsn/dque) 
+
 
 dque is:
 * embedded into your Golang program
@@ -15,7 +18,17 @@ I love tools that do one thing well.  Hopefully this fits that category.
 Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory as well as storing the segment files in between.
 
 ### performance
-There are two performance modes: Safe (default) and Turbo.  Safe mode forces an fsync to disk every time you enqueue or dequeue an item.  Turbo mode lets the OS decide when to sync your changes to disk, which means it is a lot faster.  There is a risk with Turbo mode that a power failure could corrupt a queue file.  By turning on Turbo mode you accept that risk.  Run the benchmark to see the difference on your hardware.
+There are two performance modes: safe and turbo
+##### safe mode
+* safe mode is the default
+* forces an fsync to disk every time you enqueue or dequeue an item.  
+* while this is the safest way to use dque with little risk of data loss, it is also the slowest.
+##### turbo mode 
+* can be enabled/disabled with a call to [DQue.TurboOn()](https://godoc.org/github.com/joncrlsn/dque#DQue.TurboOn) or [DQue.TurboOff()](https://godoc.org/github.com/joncrlsn/dque#DQue.TurboOff)
+* lets the OS batch up your changes to disk, which makes it a lot faster.
+* also allows you to flush changes to disk at opportune times.  See [DQue.TurboSync()](https://godoc.org/github.com/joncrlsn/dque#DQue.TurboSync)
+* comes with a risk that a power failure could lose changes.  By turning on Turbo mode you accept that risk.  
+* run the benchmark to see the difference on your hardware.
 
 ### implementation
 * The queue is held in segments of a configurable size. 
@@ -36,6 +49,9 @@ There are two performance modes: Safe (default) and Turbo.  Safe mode forces an 
   * When each item in the segment has been dequeued, the segment file is deleted and the next segment is loaded into memory.
 
 ### example
+
+See the [example code here](https://raw.githubusercontent.com/joncrlsn/dque/v2/example_test.go)
+
 ```golang
 package main
 

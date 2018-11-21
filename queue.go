@@ -1,5 +1,5 @@
 //
-// Package dque is fast, embedded, persistent FIFO queue for Go using gob encoding.
+// Package dque is a fast embedded durable queue for Go
 //
 package dque
 
@@ -7,18 +7,6 @@ package dque
 // Copyright (c) 2018 Jon Carlson.  All rights reserved.
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
-//
-
-// Test Cases:
-//
-// Enqueue first item - file is created
-// Enqueue until it creates a new segment - second file is created
-// Dequeue all items from first segment - first file gets cleaned up
-// Enqueue one and dequeue one in a loop.  Ensure we move beyond one segment.
-
-// Questions:
-//
-// Can this store strings, or is a structure required by gob encoding?
 //
 
 import (
@@ -171,7 +159,7 @@ func (q *DQue) Enqueue(obj interface{}) error {
 }
 
 // Dequeue removes and returns the first item in the queue.
-// If the queue is empty, nil and EMPTY are returned
+// When the queue is empty, nil and ErrEmpty are returned
 func (q *DQue) Dequeue() (interface{}, error) {
 
 	// This is heavy-handed but its safe
@@ -231,7 +219,7 @@ func (q *DQue) Dequeue() (interface{}, error) {
 }
 
 // Peek returns the first item in the queue without dequeueing it.
-// If the queue is empty, nil and EMPTY are returned
+// When the queue is empty, nil and ErrEmpty are returned
 func (q *DQue) Peek() (interface{}, error) {
 
 	// This is heavy-handed but its safe

@@ -231,7 +231,7 @@ func testQueue_EmptyDequeue(t *testing.T, turbo bool) {
 
 	// Dequeue an item from the empty queue
 	item, err := q.Dequeue()
-	assert(t, dque.ErrEmpty == err, "Expected an EMPTY error")
+	assert(t, dque.ErrEmpty == err, "Expected an ErrEmpty error")
 	assert(t, item == nil, "Expected nil because queue is empty")
 
 	if err := os.RemoveAll(qName); err != nil {
