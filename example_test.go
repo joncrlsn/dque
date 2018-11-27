@@ -2,12 +2,13 @@ package dque_test
 
 //
 // Example usage
+// Run with: go test -v example_test.go
 //
 
 import (
-	"log"
-
+	"fmt"
 	"github.com/joncrlsn/dque"
+	"log"
 )
 
 // Item is what we'll be storing in the queue.  It can be any struct
@@ -23,12 +24,8 @@ func ItemBuilder() interface{} {
 	return &Item{}
 }
 
-func main() {
-	ExampleDQue_main()
-}
-
 // ExampleQueue_main() show how the queue works
-func ExampleDQue_main() {
+func ExampleDQue() {
 	qName := "item-queue"
 	qDir := "/tmp"
 	segmentSize := 50
@@ -56,18 +53,16 @@ func ExampleDQue_main() {
 	var iface interface{}
 	if iface, err = q.Peek(); err != nil {
 		if err != dque.ErrEmpty {
-			log.Fatal("Error peeking at item ", err)
+			log.Fatal("Error peeking at item", err)
 		}
 	}
 	log.Println("Peeked at:", iface)
 
 	// Dequeue the next item in the queue
-	if iface, err = q.Dequeue(); err != nil {
-		if err != dque.ErrEmpty {
-			log.Fatal("Error dequeuing item ", err)
-		}
+	if iface, err = q.Dequeue(); err != nil && err != dque.ErrEmpty {
+		log.Fatal("Error dequeuing item:", err)
 	}
-	log.Println("Dequeued:", iface)
+	log.Println("Dequeued an interface:", iface)
 	log.Println("Size should be zero:", q.Size())
 
 	// Assert type of the response to an Item pointer so we can work with it
@@ -77,8 +72,9 @@ func ExampleDQue_main() {
 	}
 
 	doSomething(item)
+	// Output: Dequeued: &{Joe 1}
 }
 
 func doSomething(item *Item) {
-	log.Println("Dequeued", item)
+	fmt.Println("Dequeued:", item)
 }
