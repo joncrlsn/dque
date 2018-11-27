@@ -202,11 +202,7 @@ func (seg *qSegment) add(object interface{}) error {
 	seg.objects = append(seg.objects, object)
 
 	// Possibly force writes to disk
-	if err := seg._sync(); err != nil {
-		return err
-	}
-
-	return nil
+	return seg._sync()
 }
 
 // size returns the number of objects in this segment.
