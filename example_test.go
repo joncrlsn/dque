@@ -24,7 +24,7 @@ func ItemBuilder() interface{} {
 	return &Item{}
 }
 
-// ExampleQueue_main() show how the queue works
+// ExampleDQue shows how the queue works
 func ExampleDQue() {
 	qName := "item-queue"
 	qDir := "/tmp"
