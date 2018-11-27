@@ -55,7 +55,7 @@ type DQue struct {
 	turbo bool
 }
 
-// New creats a new durable queue
+// New creates a new durable queue
 func New(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*DQue, error) {
 
 	// Validation
