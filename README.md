@@ -6,16 +6,17 @@
 
 
 dque is:
-* embedded into your Golang program
 * persistent -- survives program restarts
 * scalable -- not limited by your RAM, but by your disk space
 * FIFO -- First In First Out
+* embedded into your Golang program
 * synchronized -- safe for concurrent usage
-* no external dependencies
+* fast or safe, you choose -- turbo mode lets the OS decide when to write to disk
+* has a liberal license -- allows any use, commercial or personal 
 
 I love tools that do one thing well.  Hopefully this fits that category.
 
-Thank you to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory as well as storing the segment files in between.
+I am indebted to Gabor Cselle who, years ago, inspired me with an example of an [in-memory persistent queue written in Java](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  I was intrigued by the simplicity of his approach, which became the foundation of the "segment" part of this queue which holds the head and the tail of the queue in memory as well as storing the segment files in between.
 
 ### performance
 There are two performance modes: safe and turbo
@@ -33,12 +34,12 @@ There are two performance modes: safe and turbo
 ### implementation
 * The queue is held in segments of a configurable size. 
 * Each segment corresponds with a file on disk. 
-* If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.
 * Segment files are only appended to and then eventually deleted.  They are never modified (other than being appended to).
+* If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.
 * Because the encoding/gob package is used to store the struct to disk:
   * Only structs can be stored in the queue.
   * Only one type of struct can be stored in each queue.
-  * Only public fields in a struct will be stored.
+  * Only public fields in a struct will be stored. 
   * A function is required that returns a pointer to a new struct of the type stored in the queue.  This function is used when loading segments into memory from disk.  I'd love to find a way to avoid this function.
 * Queue segment implementation:
   * For nice visuals, see [Gabor Cselle's documentation here](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  Note that Gabor's implementation kept the entire queue in memory as well as disk.  dque keeps only the head and tail segments in memory.
@@ -50,14 +51,16 @@ There are two performance modes: safe and turbo
 
 ### example
 
-See the [example code here](https://raw.githubusercontent.com/joncrlsn/dque/v2/example_test.go)
+See the [full example code here](https://raw.githubusercontent.com/joncrlsn/dque/v2/example_test.go)
 
+Or a shortened version here:
 ```golang
-package main
+package dque_test
 
 import (
-	"github.com/joncrlsn/dque"
 	"log"
+
+	"github.com/joncrlsn/dque"
 )
 
 // Item is what we'll be storing in the queue.  It can be any struct
@@ -74,52 +77,46 @@ func ItemBuilder() interface{} {
 }
 
 func main() {
+	ExampleDQue_main()
+}
+
+// ExampleQueue_main() show how the queue works
+func ExampleDQue_main() {
 	qName := "item-queue"
 	qDir := "/tmp"
 	segmentSize := 50
 
 	// Create a new queue with segment size of 50
-	q, err := dque.NewOrOpen(qName, qDir, segmentSize, ItemBuilder)
-	if err != nil {
-		log.Fatal("Error creating new dque ", err)
-	}
+	q, err := dque.New(qName, qDir, segmentSize, ItemBuilder)
+	...
 
 	// Add an item to the queue
-	if err := q.Enqueue(&Item{"Joe", 1}); err != nil {
-		log.Fatal("Error enqueueing item ", err)
-	}
-
-	log.Println("Size should be 1:", q.Size())
+	err := q.Enqueue(&Item{"Joe", 1})
+	...
+	
 
 	// You can reconsitute the queue from disk at any time
 	// as long as you never use the old instance
 	q, err = dque.Open(qName, qDir, segmentSize, ItemBuilder)
-	if err != nil {
-		log.Fatal("Error opening existing dque ", err)
-	}
+	...
 
+	// Peek at the next item in the queue
 	var iface interface{}
-
-	// Peek at the first item in the queue without removing it
 	if iface, err = q.Peek(); err != nil {
-		if err != dque.EMPTY {
+		if err != dque.ErrEmpty {
 			log.Fatal("Error peeking at item ", err)
 		}
 	}
 
-	log.Println("Size should still be one:", q.Size())
-
-	// Dequeue an item and act on it
+	// Dequeue the next item in the queue
 	if iface, err = q.Dequeue(); err != nil {
-		if err != dque.EMPTY {
+		if err != dque.ErrEmpty {
 			log.Fatal("Error dequeuing item ", err)
 		}
 	}
 
-	log.Println("Size should be zero:", q.Size())
-
 	// Assert type of the response to an Item pointer so we can work with it
-	item, ok := iface.(*dque.Item)
+	item, ok := iface.(*Item)
 	if !ok {
 		log.Fatal("Dequeued object is not an Item pointer")
 	}
@@ -127,13 +124,12 @@ func main() {
 	doSomething(item)
 }
 
-func doSomething(item *dque.Item) {
+func doSomething(item *Item) {
 	log.Println("Dequeued", item)
 }
 ```
 
 ### todo?
+* add a BlockedDequeue() method that blocks until the queue is no longer empty, then returns the new item.
 * store the segment size in a config file inside the queue. Then it only needs to be specified on dque.New(...)
 * add Lock() and Unlock() methods so you can peek at the first item and then conditionally dequeue it without worrying that another goroutine has grabbed it out from under you.  The use case is when you don't want to actually remove it from the queue until you know you were able to successfully handle it.
-* add a BlockedDequeue() method that blocks until the queue is no longer empty, then returns the new item.
-
