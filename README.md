@@ -9,7 +9,7 @@ dque is:
 * persistent -- survives program restarts
 * scalable -- not limited by your RAM, but by your disk space
 * FIFO -- First In First Out
-* embedded into your Golang program
+* embedded -- compiled into your Golang program
 * synchronized -- safe for concurrent usage
 * fast or safe, you choose -- turbo mode lets the OS decide when to write to disk
 * has a liberal license -- allows any use, commercial or personal 
