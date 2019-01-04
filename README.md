@@ -33,9 +33,9 @@ There are two performance modes: safe and turbo
 
 ### implementation
 * The queue is held in segments of a configurable size. 
-* Each segment corresponds with a file on disk. 
-* Segment files are only appended to and then eventually deleted.  They are never modified (other than being appended to).
-* If there is more than one segment, new items are enqueued to the last segment and dequeued from the first segment.
+* Each in-memory segment corresponds with a file on disk. Think of the segment files as a bit like rolling log files.  The oldest segment files are eventually deleted, not based on time, but whenever their items have all been dequeued.
+* Segment files are only appended to until they fill up. At which point a new segment is created.  They are never modified (other than being appended to and deleted when each of their items has been dequeued).
+* If there is more than one segment, new items are enqueued to the last segment while dequeued items are taken from the first segment.
 * Because the encoding/gob package is used to store the struct to disk:
   * Only structs can be stored in the queue.
   * Only one type of struct can be stored in each queue.
@@ -129,7 +129,8 @@ func doSomething(item *Item) {
 }
 ```
 
-### todo?
+### todo?  Feel free to submit pull requests
+* add option to enable turbo with a timeout that would ensure you would never lose more than n seconds of changes.
 * add a BlockedDequeue() method that blocks until the queue is no longer empty, then returns the new item.
-* store the segment size in a config file inside the queue. Then it only needs to be specified on dque.New(...)
 * add Lock() and Unlock() methods so you can peek at the first item and then conditionally dequeue it without worrying that another goroutine has grabbed it out from under you.  The use case is when you don't want to actually remove it from the queue until you know you were able to successfully handle it.
+* store the segment size in a config file inside the queue. Then it only needs to be specified on dque.New(...)
