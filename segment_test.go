@@ -104,7 +104,7 @@ func TestSegment_openQueueSegment_failIfNew(t *testing.T) {
 }
 
 // TestSegment_Turbo verifies the behavior of the turboOn() and turboOff() methods.
-func xTestSegment_Turbo(t *testing.T) {
+func TestSegment_Turbo(t *testing.T) {
 	testDir := "./TestSegment"
 	os.RemoveAll(testDir)
 	if err := os.Mkdir(testDir, 0755); err != nil {
@@ -131,11 +131,16 @@ func xTestSegment_Turbo(t *testing.T) {
 	if err = seg.turboOff(); err != nil {
 		t.Fatalf("Unexpecte error turning off turbo('%s')\n", testDir)
 	}
+
+	// seg.turboOff() calls seg.turboSync() which increments syncCount
+	assert(t, 2 == seg.syncCount, "syncCount must be 2 now")
+
 	_, err = seg.remove()
 	if err != nil {
 		t.Fatalf("Remove() failed with '%s'\n", err.Error())
 	}
-	assert(t, 2 == seg.syncCount, "syncCount must be 2 now") // syncCount should have increased by one
+	// seg.remove() calls seg._sync() which increments syncCount
+	assert(t, 3 == seg.syncCount, "syncCount must be 3 now")
 
 	// Cleanup
 	if err := os.RemoveAll(testDir); err != nil {

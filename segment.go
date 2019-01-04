@@ -307,7 +307,7 @@ func (seg *qSegment) turboSync() error {
 func (seg *qSegment) _sync() error {
 	if seg.turbo {
 		// We do *not* force a sync if turbo is on
-		// We just mark it maybe Dirty
+		// We just mark it maybe dirty
 		seg.maybeDirty = true
 		return nil
 	}
@@ -315,6 +315,7 @@ func (seg *qSegment) _sync() error {
 	if err := seg.file.Sync(); err != nil {
 		return errors.Wrap(err, "unable to sync file changes in _sync method.")
 	}
+	seg.syncCount++
 	seg.maybeDirty = false
 	return nil
 }
