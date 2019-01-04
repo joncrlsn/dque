@@ -92,6 +92,7 @@ func testQueue_Add2Remove1(t *testing.T, turbo bool) {
 	var err error
 	q := newQ(t, qName, turbo)
 
+	// Add 2 and remove one each loop
 	for i := 0; i < 4; i = i + 2 {
 		var item interface{}
 		if err := q.Enqueue(&item2{i}); err != nil {
@@ -113,7 +114,7 @@ func testQueue_Add2Remove1(t *testing.T, turbo bool) {
 	assert(t, firstSegNum < lastSegNum, "The first segment cannot match the second")
 
 	// Assert that the first segment is #2
-	assert(t, 2 == lastSegNum, "The last segment is not 2")
+	assert(t, 2 == lastSegNum, "The last segment must be 2")
 
 	// Now reopen the queue and check our assertions again.
 	q = openQ(t, qName, turbo)
@@ -133,8 +134,8 @@ func testQueue_Add2Remove1(t *testing.T, turbo bool) {
 		t.Fatal("Error peeking at the queue", err)
 	}
 
-	assert(t, 2 == q.Size(), "Queue size is not 2 after peeking")
-	assert(t, obj != nil, "Object is nil")
+	assert(t, 2 == q.Size(), "After peaking, aueue size must still be 2")
+	assert(t, obj != nil, "Peeked object must not be nil.")
 
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error cleaning up the queue directory", err)

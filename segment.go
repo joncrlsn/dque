@@ -43,7 +43,8 @@ type qSegment struct {
 	mutex         sync.Mutex
 	removeCount   int
 	turbo         bool
-	maybeDirty    bool // filesystem changes may not have been flushed to disk
+	maybeDirty    bool  // filesystem changes may not have been flushed to disk
+	syncCount     int64 // for testing
 }
 
 // load reads all objects from the queue file into a slice
@@ -295,6 +296,7 @@ func (seg *qSegment) turboSync() error {
 		if err := seg.file.Sync(); err != nil {
 			return errors.Wrap(err, "unable to sync file changes.")
 		}
+		seg.syncCount++
 		seg.maybeDirty = false
 	}
 	return nil

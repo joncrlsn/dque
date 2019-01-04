@@ -24,7 +24,7 @@ func item1Builder() interface{} {
 	return &item1{}
 }
 
-// Test_segment verifies the behavior of the queue segment.
+// Test_segment verifies the behavior of one segment.
 func TestSegment(t *testing.T) {
 	testDir := "./TestSegment"
 	os.RemoveAll(testDir)
@@ -38,7 +38,9 @@ func TestSegment(t *testing.T) {
 		t.Fatalf("newQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
 	}
 
+	//
 	// Add some items and remove one
+	//
 	seg.add(&item1{Name: "Number 1"})
 	assert(t, 1 == seg.size(), "Expected size of 1")
 
@@ -58,42 +60,84 @@ func TestSegment(t *testing.T) {
 	}
 	assert(t, 1 == seg.size(), "Expected size of 1")
 
-	// Recreate the segment from disk
+	//
+	// Recreate the segment from disk and remove the remaining item
+	//
 	seg, err = openQueueSegment(testDir, 1, false, item1Builder)
 	if err != nil {
 		t.Fatalf("openQueueSegment('%s') failed with '%s'\n", testDir, err.Error())
 	}
 	assert(t, 1 == seg.size(), "Expected size of 1")
 
-	for {
-		_, err := seg.remove()
-		if err != nil {
-			if err == errEmptySegment {
-				break
-			}
+	_, err = seg.remove()
+	if err != nil {
+		if err != errEmptySegment {
 			t.Fatalf("Remove() failed with '%s'\n", err.Error())
 		}
 	}
+	assert(t, 0 == seg.size(), "Expected size of 0")
 
+	// Cleanup
 	if err := os.RemoveAll(testDir); err != nil {
 		t.Fatalf("Error cleaning up directory from the TestSegment method with '%s'\n", err.Error())
 	}
 }
 
 // TestSegment_Open verifies the behavior of the openSegment function.
-func TestSegment_Open(t *testing.T) {
+func TestSegment_openQueueSegment_failIfNew(t *testing.T) {
 	testDir := "./TestSegment_Open"
 	os.RemoveAll(testDir)
 	if err := os.Mkdir(testDir, 0755); err != nil {
-		t.Fatalf("Error creating directory from the TestSegment method: %s\n", err)
+		t.Fatalf("Error creating directory in the TestSegment_Open method: %s\n", err)
 	}
 
 	seg, err := openQueueSegment(testDir, 1, false, item1Builder)
 	if err == nil {
-		t.Fatalf("openQueueSegment('%s') should have failed\n", testDir)
+		t.Fatalf("openQueueSegment('%s') should have failed because it should be new\n", testDir)
 	}
 	assert(t, seg == nil, "segment after failure must be nil")
 
+	// Cleanup
+	if err := os.RemoveAll(testDir); err != nil {
+		t.Fatalf("Error cleaning up directory from the TestSegment_Open method with '%s'\n", err.Error())
+	}
+}
+
+// TestSegment_Turbo verifies the behavior of the turboOn() and turboOff() methods.
+func xTestSegment_Turbo(t *testing.T) {
+	testDir := "./TestSegment"
+	os.RemoveAll(testDir)
+	if err := os.Mkdir(testDir, 0755); err != nil {
+		t.Fatalf("Error creating directory in the TestSegment_Turbo method: %s\n", err)
+	}
+
+	seg, err := newQueueSegment(testDir, 10, false, item1Builder)
+	if err != nil {
+		t.Fatalf("newQueueSegment('%s') failed\n", testDir)
+	}
+
+	// turbo is off so expect syncCount to change
+	seg.add(&item1{Name: "Number 1"})
+	assert(t, 1 == seg.size(), "Expected size of 1")
+	assert(t, 1 == seg.syncCount, "syncCount must be 1")
+
+	// Turn on turbo and expect sync count to stay the same.
+	seg.turboOn()
+	seg.add(&item1{Name: "Number 2"})
+	assert(t, 2 == seg.size(), "Expected size of 2")
+	assert(t, 1 == seg.syncCount, "syncCount must still be 1")
+
+	// Turn off turbo and expect the syncCount to increase when remove is called.
+	if err = seg.turboOff(); err != nil {
+		t.Fatalf("Unexpecte error turning off turbo('%s')\n", testDir)
+	}
+	_, err = seg.remove()
+	if err != nil {
+		t.Fatalf("Remove() failed with '%s'\n", err.Error())
+	}
+	assert(t, 2 == seg.syncCount, "syncCount must be 2 now") // syncCount should have increased by one
+
+	// Cleanup
 	if err := os.RemoveAll(testDir); err != nil {
 		t.Fatalf("Error cleaning up directory from the TestSegment_Open method with '%s'\n", err.Error())
 	}

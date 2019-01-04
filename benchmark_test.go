@@ -1,4 +1,9 @@
 // benchmark_test.go
+//
+// Benchmarks to see how long each operation takes on average.
+//
+// Example:   go test -bench=.
+//
 package dque_test
 
 import (
