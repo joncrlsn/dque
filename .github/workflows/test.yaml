@@ -6,9 +6,7 @@ jobs:
     strategy:
       matrix:
         go: [1.13, 1.11]
-        os: [linux, darwin, windows]
     env:
-      GOOS: ${{ matrix.os }}
       GO111MODULE: auto
     steps:
     - uses: actions/checkout@v1
@@ -19,8 +17,12 @@ jobs:
     - name: Download dependencies
       run: go mod download && go mod verify && go mod graph
     - name: Build tests
-      if: os != linux
       run: go test -c
     - name: Run unit tests
-      if: os == linux
       run: go test -v -cover ./...
+    - name: Test building on windows
+      env: {GOOS: windows}
+      run: go test -c
+    - name: Test building on darwin
+      env: {GOOS: darwin}
+      run: go test -c
