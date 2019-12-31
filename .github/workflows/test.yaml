@@ -5,15 +5,18 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [1.9, 1.13]
+        go: [1.13, 1.11]
         os: [linux, darwin, windows]
     env:
       GOOS: ${{ matrix.os }}
+      GO111MODULE: auto
     steps:
     - uses: actions/checkout@v1
     - name: Setup go
       uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
+    - name: Download dependencies
+      run: go mod download && go mod verify && go mod graph
     - name: Run unit tests
       run: go test -v -cover ./...
