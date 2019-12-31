@@ -320,6 +320,18 @@ func (seg *qSegment) _sync() error {
 	return nil
 }
 
+// close is used when this is the last segment, but is now full, so we are
+// creating a new last segment.
+// This should only be called if this segment is not also the first segment.
+func (seg *qSegment) close() error {
+
+	if err := seg.file.Close(); err != nil {
+		return errors.Wrapf(err, "unable to close segment file %s.", seg.fileName())
+	}
+
+	return nil
+}
+
 // newQueueSegment creates a new, persistent  segment of the queue
 func newQueueSegment(dirPath string, number int, turbo bool, builder func() interface{}) (*qSegment, error) {
 
@@ -337,7 +349,7 @@ func newQueueSegment(dirPath string, number int, turbo bool, builder func() inte
 	var err error
 	seg.file, err = os.OpenFile(seg.filePath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating file: "+seg.filePath())
+		return nil, errors.Wrapf(err, "error creating file: %s.", seg.filePath())
 	}
 	// Leave the file open for future writes
 

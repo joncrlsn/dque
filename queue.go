@@ -145,9 +145,21 @@ func (q *DQue) Enqueue(obj interface{}) error {
 		// We have filled our last segment to capacity, so create a new one
 		seg, err := newQueueSegment(q.fullPath, q.lastSegment.number+1, q.turbo, q.builder)
 		if err != nil {
-			return errors.Wrap(err, "error creating new queue segment: "+strconv.Itoa(q.lastSegment.number+1))
+			return errors.Wrapf(err, "error creating new queue segment: %d.", q.lastSegment.number+1)
 		}
+
+		// If the last segment is not the first segment
+		// then we need to close the file.
+		if q.firstSegment != q.lastSegment {
+			var err = q.lastSegment.close()
+			if err != nil {
+				return errors.Wrapf(err, "error closing previous segment file #%d.", q.lastSegment.number)
+			}
+		}
+
+		// Replace the last segment with the new one
 		q.lastSegment = seg
+
 	}
 
 	// Add the object to the last segment
@@ -239,8 +251,23 @@ func (q *DQue) Peek() (interface{}, error) {
 	return obj, nil
 }
 
-// Size returns the number of items in the queue. This number will be accurate
-// only if the itemsPerSegment value has not changed since the queue was last empty.
+// SafeSize locks things up while calculating so you are guaranteed an accurate size.
+func (q *DQue) SafeSize() int {
+
+	// This is heavy-handed but it is safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	return q.Size()
+}
+
+// Size returns the approximate number of items in the queue.  Use SafeSize() if
+// having the exact size is important to your use-case.
+//
+// The return value could be wildly inaccurate if the itemsPerSegment value has
+// changed since the queue was last empty.
+// Also, because this method is not synchronized, the size may change after
+// entering this method.
 func (q *DQue) Size() int {
 	if q.firstSegment.number == q.lastSegment.number {
 		return q.firstSegment.size()
