@@ -1,0 +1,13 @@
+name: lint
+on: push
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      GOLANGCILINTVERSION: 1.22.2
+    steps:
+    - uses: actions/checkout@v1
+    - name: Download golangci-lint
+      run: curl -sL https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCILINTVERSION}/golangci-lint-${GOLANGCILINTVERSION}-linux-amd64.tar.gz | tar xz
+    - name: Run golangci-lint
+      run: golangci-lint-${GOLANGCILINTVERSION}-linux-amd64/golangci-lint run

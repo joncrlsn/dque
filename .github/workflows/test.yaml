@@ -1,0 +1,19 @@
+name: test
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [1.9, 1.13]
+        os: [linux, darwin, windows]
+    env:
+      GOOS: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup go
+      uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go }}
+    - name: Run unit tests
+      run: go test -v -cover ./...
