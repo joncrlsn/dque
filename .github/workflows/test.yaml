@@ -18,5 +18,9 @@ jobs:
         go-version: ${{ matrix.go }}
     - name: Download dependencies
       run: go mod download && go mod verify && go mod graph
+    - name: Build tests
+      if: os != linux
+      run: go test -c
     - name: Run unit tests
+      if: os == linux
       run: go test -v -cover ./...
