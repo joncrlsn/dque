@@ -204,7 +204,7 @@ func testQueue_Add9Remove8(t *testing.T, turbo bool) {
 	assert(t, 3 == firstSegNum, "The last segment is not 3")
 
 	// Now reopen the queue and check our assertions again.
-	q = openQ(t, qName, turbo)
+	_ = openQ(t, qName, turbo)
 
 	// Assert that we have more than one segment
 	assert(t, firstSegNum == lastSegNum, "After opening, the first segment must match the second")
@@ -299,7 +299,7 @@ func TestQueue_Turbo(t *testing.T) {
 			t.Fatal("Error enqueueing:", err)
 		}
 	}
-	elapsedTurbo := time.Now().Sub(start)
+	elapsedTurbo := time.Since(start)
 
 	assert(t, q.Turbo(), "Expected turbo to be on")
 
@@ -314,7 +314,7 @@ func TestQueue_Turbo(t *testing.T) {
 			t.Fatal("Error enqueueing:", err)
 		}
 	}
-	elapsedSafe := time.Now().Sub(start)
+	elapsedSafe := time.Since(start)
 
 	t.Logf("Turbo time: %v  Safe time: %v", elapsedTurbo, elapsedSafe)
 	assert(t, elapsedTurbo < elapsedSafe/2, "Turbo must be faster than safe mode")
@@ -332,7 +332,7 @@ func newOrOpenQ(t *testing.T, qName string, turbo bool) *dque.DQue {
 	}
 
 	if turbo {
-		q.TurboOn()
+		_ = q.TurboOn()
 	}
 	return q
 }
@@ -344,7 +344,7 @@ func newQ(t *testing.T, qName string, turbo bool) *dque.DQue {
 		t.Fatal("Error creating new dque:", err)
 	}
 	if turbo {
-		q.TurboOn()
+		_ = q.TurboOn()
 	}
 	return q
 }
@@ -356,7 +356,7 @@ func openQ(t *testing.T, qName string, turbo bool) *dque.DQue {
 		t.Fatal("Error opening dque:", err)
 	}
 	if turbo {
-		q.TurboOn()
+		_ = q.TurboOn()
 	}
 	return q
 }

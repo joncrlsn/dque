@@ -30,7 +30,7 @@ var (
 )
 
 func init() {
-	filePattern, _ = regexp.Compile("^([0-9]+)\\.dque$")
+	filePattern, _ = regexp.Compile(`^([0-9]+)\.dque$`)
 }
 
 type config struct {
@@ -81,7 +81,11 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 	q.fullPath = fullPath
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
-	q.load()
+
+	if err := q.load(); err != nil {
+		return nil, err
+	}
+
 	return &q, nil
 }
 
@@ -107,7 +111,11 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 	q.fullPath = fullPath
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
-	q.load()
+
+	if err := q.load(); err != nil {
+		return nil, err
+	}
+
 	return &q, nil
 }
 
