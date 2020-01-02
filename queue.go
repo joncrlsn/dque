@@ -259,31 +259,30 @@ func (q *DQue) Peek() (interface{}, error) {
 	return obj, nil
 }
 
-// SafeSize locks things up while calculating so you are guaranteed an accurate size.
-func (q *DQue) SafeSize() int {
+// Size locks things up while calculating so you are guaranteed an accurate
+// size... unless you have changed the itemsPerSegment value since the queue
+// was last empty.  Then it could be wildly inaccurate.
+func (q *DQue) Size() int {
 
 	// This is heavy-handed but it is safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
-	return q.Size()
+	return q.SizeUnsafe()
 }
 
-// Size returns the approximate number of items in the queue.  Use SafeSize() if
+// SizeUnsafe returns the approximate number of items in the queue.  Use Size() if
 // having the exact size is important to your use-case.
 //
 // The return value could be wildly inaccurate if the itemsPerSegment value has
 // changed since the queue was last empty.
 // Also, because this method is not synchronized, the size may change after
 // entering this method.
-func (q *DQue) Size() int {
+func (q *DQue) SizeUnsafe() int {
 	if q.firstSegment.number == q.lastSegment.number {
 		return q.firstSegment.size()
 	}
-	if q.firstSegment.number == q.lastSegment.number+1 {
-		return q.firstSegment.size() + q.lastSegment.size()
-	}
-	numSegmentsBetween := (q.lastSegment.number - q.firstSegment.number - 1)
+	numSegmentsBetween := q.lastSegment.number - q.firstSegment.number - 1
 	return q.firstSegment.size() + (numSegmentsBetween * q.config.ItemsPerSegment) + q.lastSegment.size()
 }
 
