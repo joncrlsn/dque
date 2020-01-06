@@ -179,7 +179,7 @@ func (q *DQue) Enqueue(obj interface{}) error {
 }
 
 // Dequeue removes and returns the first item in the queue.
-// When the queue is empty, nil and ErrEmpty are returned
+// When the queue is empty, nil and dque.ErrEmpty are returned.
 func (q *DQue) Dequeue() (interface{}, error) {
 
 	// This is heavy-handed but its safe
@@ -239,10 +239,11 @@ func (q *DQue) Dequeue() (interface{}, error) {
 }
 
 // Peek returns the first item in the queue without dequeueing it.
-// When the queue is empty, nil and ErrEmpty are returned
+// When the queue is empty, nil and dque.ErrEmpty are returned.
+// Do not use this method with multiple dequeueing threads or you may regret it.
 func (q *DQue) Peek() (interface{}, error) {
 
-	// This is heavy-handed but its safe
+	// This is heavy-handed but it is safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
