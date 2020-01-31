@@ -6,6 +6,7 @@ package dque
 //
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -80,6 +81,43 @@ func TestSegment(t *testing.T) {
 	// Cleanup
 	if err := os.RemoveAll(testDir); err != nil {
 		t.Fatalf("Error cleaning up directory from the TestSegment method with '%s'\n", err.Error())
+	}
+}
+
+// TestSegment_ErrCorruptedSegment tests error handling for corrupted data
+func TestSegment_ErrCorruptedSegment(t *testing.T) {
+	testDir := "./TestSegmentError"
+	os.RemoveAll(testDir)
+	// defer os.RemoveAll((testDir))
+
+	if err := os.Mkdir(testDir, 0755); err != nil {
+		t.Fatalf("Error creating directory in the TestSegment_ErrCorruptedSegment method: %s\n", err)
+	}
+
+	f, err := os.Create((&qSegment{dirPath: testDir}).filePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect an 8 byte object, but only write 7 bytes
+	if _, err := f.Write([]byte{0, 0, 0, 8, 1, 2, 3, 4, 5, 6, 7}); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	_, err = openQueueSegment(testDir, 0, false, func() interface{} { return make([]byte, 8) })
+	if err == nil {
+		t.Fatal("expected ErrCorruptedSegment but got nil")
+	}
+	var corruptedError ErrCorruptedSegment
+	if !errors.As(err, &corruptedError) {
+		t.Fatalf("expected ErrCorruptedSegment but got %T: %s", err, err)
+	}
+	if corruptedError.Path != "TestSegmentError/0000000000000.dque" {
+		t.Fatalf("unexpected file path: %s", corruptedError.Path)
+	}
+	if corruptedError.Error() != "segment file TestSegmentError/0000000000000.dque is corrupted: error reading gob data from file: EOF" {
+		t.Fatalf("wrong error message: %s", corruptedError.Error())
 	}
 }
 
