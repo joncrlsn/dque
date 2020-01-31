@@ -119,7 +119,7 @@ func (seg *qSegment) load() error {
 
 		// Decode the bytes into an object
 		object := seg.objectBuilder()
-		if err := dec.Decode(object); err != nil {
+		if err := gob.NewDecoder(buf).Decode(object); err != nil {
 			return errors.Wrapf(err, "failed to decode %T object from segment file %d", object, seg.number)
 		}
 
