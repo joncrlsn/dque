@@ -42,10 +42,10 @@ func TestSegment(t *testing.T) {
 	//
 	// Add some items and remove one
 	//
-	seg.add(&item1{Name: "Number 1"})
+	assert(t, seg.add(&item1{Name: "Number 1"}) == nil, "failed to add item1")
 	assert(t, 1 == seg.size(), "Expected size of 1")
 
-	seg.add(&item1{Name: "Number 2"})
+	assert(t, seg.add(&item1{Name: "Number 2"}) == nil, "failed to add item2")
 	assert(t, 2 == seg.size(), "Expected size of 2")
 	_, err = seg.remove()
 	if err != nil {
@@ -53,7 +53,7 @@ func TestSegment(t *testing.T) {
 	}
 	assert(t, 1 == seg.size(), "Expected size of 1")
 	assert(t, 2 == seg.sizeOnDisk(), "Expected sizeOnDisk of 2")
-	seg.add(&item1{Name: "item3"})
+	assert(t, seg.add(&item1{Name: "item3"}) == nil, "failed to add item3")
 	assert(t, 2 == seg.size(), "Expected size of 2")
 	_, err = seg.remove()
 	if err != nil {
@@ -155,13 +155,13 @@ func TestSegment_Turbo(t *testing.T) {
 	}
 
 	// turbo is off so expect syncCount to change
-	seg.add(&item1{Name: "Number 1"})
+	assert(t, seg.add(&item1{Name: "Number 1"}) == nil, "failed to add item1")
 	assert(t, 1 == seg.size(), "Expected size of 1")
 	assert(t, 1 == seg.syncCount, "syncCount must be 1")
 
 	// Turn on turbo and expect sync count to stay the same.
 	seg.turboOn()
-	seg.add(&item1{Name: "Number 2"})
+	assert(t, seg.add(&item1{Name: "Number 2"}) == nil, "failed to add item2")
 	assert(t, 2 == seg.size(), "Expected size of 2")
 	assert(t, 1 == seg.syncCount, "syncCount must still be 1")
 

@@ -30,7 +30,7 @@ var (
 )
 
 func init() {
-	filePattern, _ = regexp.Compile("^([0-9]+)\\.dque$")
+	filePattern, _ = regexp.Compile(`^([0-9]+)\.dque$`)
 }
 
 type config struct {
@@ -81,7 +81,11 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 	q.fullPath = fullPath
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
-	q.load()
+
+	if err := q.load(); err != nil {
+		return nil, err
+	}
+
 	return &q, nil
 }
 
@@ -107,7 +111,11 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 	q.fullPath = fullPath
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
-	q.load()
+
+	if err := q.load(); err != nil {
+		return nil, err
+	}
+
 	return &q, nil
 }
 
@@ -171,7 +179,7 @@ func (q *DQue) Enqueue(obj interface{}) error {
 }
 
 // Dequeue removes and returns the first item in the queue.
-// When the queue is empty, nil and ErrEmpty are returned
+// When the queue is empty, nil and dque.ErrEmpty are returned.
 func (q *DQue) Dequeue() (interface{}, error) {
 
 	// This is heavy-handed but its safe
@@ -231,10 +239,11 @@ func (q *DQue) Dequeue() (interface{}, error) {
 }
 
 // Peek returns the first item in the queue without dequeueing it.
-// When the queue is empty, nil and ErrEmpty are returned
+// When the queue is empty, nil and dque.ErrEmpty are returned.
+// Do not use this method with multiple dequeueing threads or you may regret it.
 func (q *DQue) Peek() (interface{}, error) {
 
-	// This is heavy-handed but its safe
+	// This is heavy-handed but it is safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
@@ -251,31 +260,30 @@ func (q *DQue) Peek() (interface{}, error) {
 	return obj, nil
 }
 
-// SafeSize locks things up while calculating so you are guaranteed an accurate size.
-func (q *DQue) SafeSize() int {
+// Size locks things up while calculating so you are guaranteed an accurate
+// size... unless you have changed the itemsPerSegment value since the queue
+// was last empty.  Then it could be wildly inaccurate.
+func (q *DQue) Size() int {
 
 	// This is heavy-handed but it is safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
-	return q.Size()
+	return q.SizeUnsafe()
 }
 
-// Size returns the approximate number of items in the queue.  Use SafeSize() if
+// SizeUnsafe returns the approximate number of items in the queue.  Use Size() if
 // having the exact size is important to your use-case.
 //
 // The return value could be wildly inaccurate if the itemsPerSegment value has
 // changed since the queue was last empty.
 // Also, because this method is not synchronized, the size may change after
 // entering this method.
-func (q *DQue) Size() int {
+func (q *DQue) SizeUnsafe() int {
 	if q.firstSegment.number == q.lastSegment.number {
 		return q.firstSegment.size()
 	}
-	if q.firstSegment.number == q.lastSegment.number+1 {
-		return q.firstSegment.size() + q.lastSegment.size()
-	}
-	numSegmentsBetween := (q.lastSegment.number - q.firstSegment.number - 1)
+	numSegmentsBetween := q.lastSegment.number - q.firstSegment.number - 1
 	return q.firstSegment.size() + (numSegmentsBetween * q.config.ItemsPerSegment) + q.lastSegment.size()
 }
 

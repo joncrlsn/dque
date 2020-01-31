@@ -119,9 +119,8 @@ func (seg *qSegment) load() error {
 
 		// Decode the bytes into an object
 		object := seg.objectBuilder()
-		if err := gob.NewDecoder(buf).Decode(object); err != nil {
-			log.Printf("WARNING: ignoring corrupted %d byte object in dque segment file %s", gobLen, seg.filePath())
-			continue
+		if err := dec.Decode(object); err != nil {
+			return errors.Wrapf(err, "failed to decode %T object from segment file %d", object, seg.number)
 		}
 
 		// Add item to the objects slice
@@ -174,7 +173,7 @@ func (seg *qSegment) remove() (interface{}, error) {
 
 	// Write the 4-byte length (of zero) first
 	if _, err := seg.file.Write(deleteLenBytes); err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to remove item from segment %d", seg.number)
 	}
 
 	// Save a reference to the first item in the in-memory queue
@@ -204,8 +203,7 @@ func (seg *qSegment) add(object interface{}) error {
 	// Encode the struct to a byte buffer
 	var buff bytes.Buffer
 	enc := gob.NewEncoder(&buff)
-	err := enc.Encode(object)
-	if err != nil {
+	if err := enc.Encode(object); err != nil {
 		return errors.Wrap(err, "error gob encoding object")
 	}
 
@@ -217,12 +215,12 @@ func (seg *qSegment) add(object interface{}) error {
 
 	// Write the 4-byte buffer length first
 	if _, err := seg.file.Write(buffLenBytes); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to write object length to segment %d", seg.number)
 	}
 
 	// Then write the buffer bytes
 	if _, err := seg.file.Write(buff.Bytes()); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to write object to segment %d", seg.number)
 	}
 
 	seg.objects = append(seg.objects, object)
