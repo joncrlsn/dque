@@ -6,12 +6,13 @@ package dque
 //
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 // item1 is the thing we'll be storing in the queue
@@ -88,7 +89,7 @@ func TestSegment(t *testing.T) {
 func TestSegment_ErrCorruptedSegment(t *testing.T) {
 	testDir := "./TestSegmentError"
 	os.RemoveAll(testDir)
-	// defer os.RemoveAll((testDir))
+	defer os.RemoveAll((testDir))
 
 	if err := os.Mkdir(testDir, 0755); err != nil {
 		t.Fatalf("Error creating directory in the TestSegment_ErrCorruptedSegment method: %s\n", err)
