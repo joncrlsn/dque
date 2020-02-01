@@ -29,6 +29,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ErrCorruptedSegment is returned when a segment file cannot be opened due to inconsistent formatting.
+// Recovery may be possible by clearing or deleting the file, then reloading using dque.New().
+type ErrCorruptedSegment struct {
+	Path string
+	Err  error
+}
+
+func (e ErrCorruptedSegment) Error() string {
+	return fmt.Sprintf("segment file %s is corrupted: %s", e.Path, e.Err)
+}
+
+func (e ErrCorruptedSegment) Unwrap() error {
+	return e.Err
+}
+
 var (
 	errEmptySegment = errors.New("Segment is empty")
 )
@@ -78,7 +93,10 @@ func (seg *qSegment) load() error {
 			return nil
 		}
 		if bytesRead != 4 {
-			return errors.New("not enough bytes were read")
+			return ErrCorruptedSegment{
+				Path: seg.filePath(),
+				Err:  fmt.Errorf("end of file reached before reading object length (read %d/4 bytes)", bytesRead),
+			}
 		}
 
 		// Convert the bytes into a 32-bit unsigned int
@@ -91,19 +109,17 @@ func (seg *qSegment) load() error {
 			continue
 		}
 
-		// Make a byte array the exact size of the gob
-		// Then read the gob into it
-		gobBytes := make([]byte, gobLen)
-		_, err = seg.file.Read(gobBytes)
-		if err != nil {
-			return errors.Wrap(err, "error reading gob bytes")
+		buf := &bytes.Buffer{}
+		if _, err := io.CopyN(buf, seg.file, int64(gobLen)); err != nil {
+			return ErrCorruptedSegment{
+				Path: seg.filePath(),
+				Err:  errors.Wrap(err, "error reading gob data from file"),
+			}
 		}
 
 		// Decode the bytes into an object
-		reader := bytes.NewReader(gobBytes)
-		dec := gob.NewDecoder(reader)
 		object := seg.objectBuilder()
-		if err := dec.Decode(object); err != nil {
+		if err := gob.NewDecoder(buf).Decode(object); err != nil {
 			return errors.Wrapf(err, "failed to decode %T object from segment file %d", object, seg.number)
 		}
 
