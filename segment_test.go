@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 // item1 is the thing we'll be storing in the queue
@@ -110,8 +108,13 @@ func TestSegment_ErrCorruptedSegment(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected ErrCorruptedSegment but got nil")
 	}
-	var corruptedError ErrCorruptedSegment
-	if !errors.As(err, &corruptedError) {
+	// // go >= 1.13:
+	// var corruptedError ErrCorruptedSegment
+	// if !errors.As(err, &corruptedError) {
+	// 	t.Fatalf("expected ErrCorruptedSegment but got %T: %s", err, err)
+	// }
+	corruptedError, ok := unwrapError(unwrapError(err)).(ErrCorruptedSegment)
+	if !ok {
 		t.Fatalf("expected ErrCorruptedSegment but got %T: %s", err, err)
 	}
 	if corruptedError.Path != "TestSegmentError/0000000000000.dque" {
@@ -120,6 +123,10 @@ func TestSegment_ErrCorruptedSegment(t *testing.T) {
 	if corruptedError.Error() != "segment file TestSegmentError/0000000000000.dque is corrupted: error reading gob data from file: EOF" {
 		t.Fatalf("wrong error message: %s", corruptedError.Error())
 	}
+}
+
+func unwrapError(err error) error {
+	return err.(interface{ Unwrap() error }).Unwrap()
 }
 
 // TestSegment_Open verifies the behavior of the openSegment function.
