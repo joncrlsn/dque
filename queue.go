@@ -12,6 +12,7 @@ package dque
 import (
 	"strconv"
 	"sync"
+	"syscall"
 
 	"github.com/pkg/errors"
 
@@ -21,6 +22,8 @@ import (
 	"path"
 	"regexp"
 )
+
+const LOCK_FILE = "lock.lock"
 
 var (
 	filePattern *regexp.Regexp
@@ -47,6 +50,7 @@ type DQue struct {
 	config  config
 
 	fullPath     string
+	lockfile     *os.File
 	firstSegment *qSegment
 	lastSegment  *qSegment
 	builder      func() interface{} // builds a structure to load via gob
@@ -82,6 +86,10 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
 
+	if err := q.lock(); err != nil {
+		return nil, err
+	}
+
 	if err := q.load(); err != nil {
 		return nil, err
 	}
@@ -112,6 +120,10 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
 
+	if err := q.lock(); err != nil {
+		return nil, err
+	}
+
 	if err := q.load(); err != nil {
 		return nil, err
 	}
@@ -138,6 +150,30 @@ func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() 
 	}
 
 	return New(name, dirPath, itemsPerSegment, builder)
+}
+
+// Close releases the lock on the queue directory rendering it unusable for further usage.
+// Close will return an error if it has already been called.
+func (q *DQue) Close() error {
+	if q.lockfile == nil {
+		return errors.New("the queue directory has already been closed")
+	}
+
+	err := syscall.Flock(int(q.lockfile.Fd()), syscall.F_UNLCK)
+	if err != nil {
+		return err
+	}
+	err = q.lockfile.Close()
+	if err != nil {
+		return err
+	}
+	err = os.Remove(path.Join(q.DirPath, q.Name, LOCK_FILE))
+	if err != nil {
+		return err
+	}
+
+	q.lockfile = nil
+	return nil
 }
 
 // Enqueue adds an item to the end of the queue
@@ -406,5 +442,21 @@ func (q *DQue) load() error {
 		q.lastSegment = seg
 	}
 
+	return nil
+}
+
+func (q *DQue) lock() error {
+	l := path.Join(q.DirPath, q.Name, LOCK_FILE)
+	f, err := os.OpenFile(l, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+
+	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	if err != nil {
+		return err
+	}
+
+	q.lockfile = f
 	return nil
 }

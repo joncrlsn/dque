@@ -42,8 +42,10 @@ func ExampleDQue() {
 	}
 	log.Println("Size should be 1:", q.Size())
 
+	// Properly close a queue
+	q.Close()
+
 	// You can reconsitute the queue from disk at any time
-	// as long as you never use the old instance
 	q, err = dque.Open(qName, qDir, segmentSize, ItemBuilder)
 	if err != nil {
 		log.Fatal("Error opening existing dque ", err)

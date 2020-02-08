@@ -61,6 +61,7 @@ func testQueue_AddRemoveLoop(t *testing.T, turbo bool) {
 	assert(t, 2 == firstSegNum, "The first segment is not 2")
 
 	// Now reopen the queue and check our assertions again.
+	q.Close()
 	q = openQ(t, qName, turbo)
 
 	firstSegNum, lastSegNum = q.SegmentNumbers()
@@ -117,6 +118,7 @@ func testQueue_Add2Remove1(t *testing.T, turbo bool) {
 	assert(t, 2 == lastSegNum, "The last segment must be 2")
 
 	// Now reopen the queue and check our assertions again.
+	q.Close()
 	q = openQ(t, qName, turbo)
 
 	firstSegNum, lastSegNum = q.SegmentNumbers()
@@ -204,6 +206,7 @@ func testQueue_Add9Remove8(t *testing.T, turbo bool) {
 	assert(t, 3 == firstSegNum, "The last segment is not 3")
 
 	// Now reopen the queue and check our assertions again.
+	q.Close()
 	_ = openQ(t, qName, turbo)
 
 	// Assert that we have more than one segment
@@ -253,10 +256,12 @@ func testQueue_NewOrOpen(t *testing.T, turbo bool) {
 	}
 
 	// Create new queue with newOrOpen
-	newOrOpenQ(t, qName, turbo)
+	q := newOrOpenQ(t, qName, turbo)
+	q.Close()
 
 	// Open the same queue with newOrOpen
-	newOrOpenQ(t, qName, turbo)
+	q = newOrOpenQ(t, qName, turbo)
+	q.Close()
 
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error cleaning up the queue directory:", err)
@@ -321,6 +326,56 @@ func TestQueue_Turbo(t *testing.T) {
 
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error cleaning up the queue directory:", err)
+	}
+}
+
+func TestQueue_NewFlock(t *testing.T) {
+	qName := "testFlock"
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error cleaning up the queue directory:", err)
+	}
+
+	// New and Close a DQue properly should work
+	q, err := dque.New(qName, ".", 3, item2Builder)
+	if err != nil {
+		t.Fatal("Error creating dque:", err)
+	}
+	err = q.Close()
+	if err != nil {
+		t.Fatal("Error closing dque:", err)
+	}
+
+	// Double-open should fail
+	q, err = dque.Open(qName, ".", 3, item2Builder)
+	if err != nil {
+		t.Fatal("Error opening dque:", err)
+	}
+	_, err = dque.Open(qName, ".", 3, item2Builder)
+	if err == nil {
+		t.Fatal("No error during double-open dque")
+	}
+	err = q.Close()
+	if err != nil {
+		t.Fatal("Error closing dque:", err)
+	}
+
+	// Double-close should fail
+	q, err = dque.Open(qName, ".", 3, item2Builder)
+	if err != nil {
+		t.Fatal("Error opening dque:", err)
+	}
+	err = q.Close()
+	if err != nil {
+		t.Fatal("Error closing dque:", err)
+	}
+	err = q.Close()
+	if err == nil {
+		t.Fatal("No error during double-closing dque")
+	}
+
+	// Cleanup
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory:", err)
 	}
 }
 
