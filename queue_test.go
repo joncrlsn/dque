@@ -324,6 +324,79 @@ func TestQueue_Turbo(t *testing.T) {
 	}
 }
 
+func TestQueue_BatchOperations(t *testing.T) {
+	if err := os.RemoveAll(t.Name()); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+
+	queue := newQ(t, t.Name(), false)
+	defer os.RemoveAll(t.Name())
+
+	for i := 0; i < 3; i++ {
+		if err := queue.Enqueue(&item2{i}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	peek2, err := queue.BatchPeek(2)
+	assert(t, err == nil, "unexpected error: %s", err)
+	assert(t, len(peek2) == 2, "expected 2 items: %#v", peek2)
+
+	peek4, err := queue.BatchPeek(4)
+	assert(t, err == nil, "unexpected error: %s", err)
+	assert(t, len(peek4) == 3, "expected 3 items: %#v", peek4)
+
+	dequeue2, err := queue.BatchDequeue(2)
+	assert(t, err == nil, "unexpected error: %s", err)
+	assert(t, len(dequeue2) == 2, "expected 2 items: %#v", dequeue2)
+
+	peek2more, err := queue.BatchPeek(2)
+	assert(t, err == nil, "unexpected error: %s", err)
+	assert(t, len(peek2more) == 1, "expected 1 item: %#v", peek2more)
+
+	dequeue2more, err := queue.BatchDequeue(2)
+	assert(t, err == nil, "unexpected error: %s", err)
+	assert(t, len(dequeue2more) == 1, "expected 1 item: %v", dequeue2more)
+}
+
+func TestQueue_BatchDequeueEmpty(t *testing.T) {
+	if err := os.RemoveAll(t.Name()); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+
+	queue := newQ(t, t.Name(), false)
+	defer os.RemoveAll(t.Name())
+
+	empty, d0err := queue.BatchDequeue(0)
+	assert(t, d0err == nil, "no error expected: %s", d0err)
+	assert(t, len(empty) == 0, "no objects expected: %v", empty)
+
+	_, d1err := queue.BatchDequeue(1)
+	assert(t, d1err == dque.ErrEmpty, "queue should be empty: %s", d1err)
+
+	_, d2err := queue.BatchDequeue(2)
+	assert(t, d2err == dque.ErrEmpty, "queue should be empty: %s", d2err)
+}
+
+func TestQueue_BatchPeekEmpty(t *testing.T) {
+	if err := os.RemoveAll(t.Name()); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+
+	queue := newQ(t, t.Name(), false)
+	defer os.RemoveAll(t.Name())
+
+	empty, err0 := queue.BatchPeek(0)
+	assert(t, err0 == nil, "no error expected: %s", err0)
+	assert(t, len(empty) == 0, "no objects expected: %v", empty)
+
+	_, err1 := queue.BatchPeek(1)
+	assert(t, err1 == dque.ErrEmpty, "queue should be empty: %s", err1)
+
+	_, err2 := queue.BatchPeek(2)
+	assert(t, err2 == dque.ErrEmpty, "queue should be empty: %s", err2)
+}
+
 func newOrOpenQ(t *testing.T, qName string, turbo bool) *dque.DQue {
 	// Create a new segment with segment size of 3
 	q, err := dque.NewOrOpen(qName, ".", 3, item2Builder)
