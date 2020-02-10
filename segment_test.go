@@ -120,7 +120,7 @@ func TestSegment_ErrCorruptedSegment(t *testing.T) {
 	if corruptedError.Path != "TestSegmentError/0000000000000.dque" {
 		t.Fatalf("unexpected file path: %s", corruptedError.Path)
 	}
-	if corruptedError.Error() != "segment file TestSegmentError/0000000000000.dque is corrupted: error reading gob data from file: EOF" {
+	if corruptedError.Error() != "segment file TestSegmentError/0000000000000.dque is corrupted: error reading gob data from file: unexpected EOF" {
 		t.Fatalf("wrong error message: %s", corruptedError.Error())
 	}
 }
