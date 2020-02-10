@@ -21,7 +21,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"sync"
@@ -44,6 +43,20 @@ func (e ErrCorruptedSegment) Unwrap() error {
 	return e.Err
 }
 
+// ErrUnableToDecode is returned when an object cannot be decoded.
+type ErrUnableToDecode struct {
+	Path string
+	Err  error
+}
+
+func (e ErrUnableToDecode) Error() string {
+	return fmt.Sprintf("object in segment file %s cannot be decoded: %s", e.Path, e.Err)
+}
+
+func (e ErrUnableToDecode) Unwrap() error {
+	return e.Err
+}
+
 var (
 	errEmptySegment = errors.New("Segment is empty")
 )
@@ -63,6 +76,7 @@ type qSegment struct {
 }
 
 // load reads all objects from the queue file into a slice
+// returns ErrCorruptedSegment or ErrUnableToDecode for errors pertaining to file contents.
 func (seg *qSegment) load() error {
 
 	// This is heavy-handed but its safe
@@ -70,32 +84,24 @@ func (seg *qSegment) load() error {
 	defer seg.mutex.Unlock()
 
 	// Open the file in read mode
-	var err error
-	seg.file, err = os.OpenFile(seg.filePath(), os.O_RDONLY, 0644)
-	if err != nil {
+	if f, err := os.OpenFile(seg.filePath(), os.O_RDONLY, 0644); err != nil {
 		return errors.Wrap(err, "error opening file: "+seg.filePath())
+	} else {
+		defer f.Close()
+		seg.file = f
 	}
-	defer seg.file.Close()
 
 	// Loop until we can load no more
 	for {
 		// Read the 4 byte length of the gob
 		lenBytes := make([]byte, 4)
-		bytesRead, err := seg.file.Read(lenBytes)
-		if err != nil {
+		if n, err := io.ReadFull(seg.file, lenBytes); err != nil {
 			if err == io.EOF {
-				break
+				return nil
 			}
-			return err
-		}
-		if bytesRead == 0 {
-			log.Printf("qSegment.load() did nothing. %s files is new\n", seg.filePath())
-			return nil
-		}
-		if bytesRead != 4 {
 			return ErrCorruptedSegment{
 				Path: seg.filePath(),
-				Err:  fmt.Errorf("end of file reached before reading object length (read %d/4 bytes)", bytesRead),
+				Err:  errors.Wrapf(err, "error reading object length (read %d/4 bytes)", n),
 			}
 		}
 
@@ -103,14 +109,20 @@ func (seg *qSegment) load() error {
 		gobLen := binary.LittleEndian.Uint32(lenBytes)
 		if gobLen == 0 {
 			// Remove the first item from the in-memory queue
+			if len(seg.objects) == 0 {
+				return ErrCorruptedSegment{
+					Path: seg.filePath(),
+					Err:  fmt.Errorf("excess deletion records (%d)", seg.removeCount+1),
+				}
+			}
 			seg.objects = seg.objects[1:]
-			//fmt.Println("TEMP: Detected delete in load()")
+			// log.Println("TEMP: Detected delete in load()")
 			seg.removeCount++
 			continue
 		}
 
-		buf := &bytes.Buffer{}
-		if _, err := io.CopyN(buf, seg.file, int64(gobLen)); err != nil {
+		data := make([]byte, int(gobLen))
+		if _, err := io.ReadFull(seg.file, data); err != nil {
 			return ErrCorruptedSegment{
 				Path: seg.filePath(),
 				Err:  errors.Wrap(err, "error reading gob data from file"),
@@ -119,18 +131,18 @@ func (seg *qSegment) load() error {
 
 		// Decode the bytes into an object
 		object := seg.objectBuilder()
-		if err := gob.NewDecoder(buf).Decode(object); err != nil {
-			return errors.Wrapf(err, "failed to decode %T object from segment file %d", object, seg.number)
+		if err := gob.NewDecoder(bytes.NewReader(data)).Decode(object); err != nil {
+			return ErrUnableToDecode{
+				Path: seg.filePath(),
+				Err:  errors.Wrapf(err, "failed to decode %T", object),
+			}
 		}
 
 		// Add item to the objects slice
 		seg.objects = append(seg.objects, object)
 
-		//fmt.Printf("TEMP: Loaded: %#v\n", object)
+		// log.Printf("TEMP: Loaded: %#v\n", object)
 	}
-
-	//fmt.Printf("TEMP: Loaded %d objects into memory\n", len(seg.objects))
-	return nil
 }
 
 // peek returns the first item in the segment without removing it.
