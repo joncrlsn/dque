@@ -45,7 +45,8 @@ func (e ErrCorruptedSegment) Unwrap() error {
 }
 
 var (
-	errEmptySegment = errors.New("Segment is empty")
+	errEmptySegment    = errors.New("Segment is empty")
+	errIndexOutOfRange = errors.New("Segment index out of range")
 )
 
 // qSegment represents a portion (segment) of a persistent queue
@@ -134,22 +135,19 @@ func (seg *qSegment) load() error {
 }
 
 // peek returns the first item in the segment without removing it.
-// If the queue is already empty, the emptySegment error will be returned.
-func (seg *qSegment) peek() (interface{}, error) {
+// errIndexOutOfRange error will be returned if pos is beyond the slice length (ex. the queue is empty).
+func (seg *qSegment) peek(pos int) (interface{}, error) {
 
 	// This is heavy-handed but its safe
 	seg.mutex.Lock()
 	defer seg.mutex.Unlock()
 
-	if len(seg.objects) == 0 {
-		// Queue is empty so return nil object (and emptySegment error)
-		return nil, errEmptySegment
+	if pos >= len(seg.objects) {
+		return nil, errIndexOutOfRange
 	}
 
-	// Save a reference to the first item in the in-memory queue
-	object := seg.objects[0]
-
-	return object, nil
+	// Return a reference to the object
+	return seg.objects[pos], nil
 }
 
 // remove removes and returns the first item in the segment and adds
@@ -270,8 +268,8 @@ func (seg *qSegment) delete() error {
 		return errors.Wrap(err, "error deleting file: "+seg.filePath())
 	}
 
-	// Empty the in-memory slice of objects
-	seg.objects = seg.objects[:0]
+	// Remove reference to in-memory slice of objects
+	seg.objects = nil
 
 	seg.file = nil
 

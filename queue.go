@@ -238,6 +238,27 @@ func (q *DQue) Dequeue() (interface{}, error) {
 	return obj, nil
 }
 
+// BatchDequeue dequeues and returns a slice of up to 1-n objects.
+// Fewer than n items may be returned, depending on the remaining objects in the first segment.
+// ErrEmpty is returned if the queue is empty.
+func (q *DQue) BatchDequeue(n int) ([]interface{}, error) {
+	var objects []interface{}
+
+	for i := 0; i < n; i++ {
+		obj, err := q.Dequeue()
+		if err != nil {
+			if err == ErrEmpty && len(objects) > 0 {
+				return objects, nil
+			}
+			return nil, err
+		}
+
+		objects = append(objects, obj)
+	}
+
+	return objects, nil
+}
+
 // Peek returns the first item in the queue without dequeueing it.
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 // Do not use this method with multiple dequeueing threads or you may regret it.
@@ -248,8 +269,8 @@ func (q *DQue) Peek() (interface{}, error) {
 	defer q.mutex.Unlock()
 
 	// Return the first object from the first segment
-	obj, err := q.firstSegment.peek()
-	if err == errEmptySegment {
+	obj, err := q.firstSegment.peek(0)
+	if err == errIndexOutOfRange {
 		return nil, ErrEmpty
 	}
 	if err != nil {
@@ -258,6 +279,35 @@ func (q *DQue) Peek() (interface{}, error) {
 	}
 
 	return obj, nil
+}
+
+// BatchPeek returns a slice of up to 1-n objects without dequeueing them.
+// Fewer than n items may be returned, depending on the remaining objects in the first segment.
+// ErrEmpty is returned if the queue is empty.
+func (q *DQue) BatchPeek(n int) ([]interface{}, error) {
+	var objects []interface{}
+
+	// Lock the entire queue to get a consistent slice of objects.
+	// note: this could potentially be optimized in the future to only lock the first segment.
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	for i := 0; i < n; i++ {
+		obj, err := q.firstSegment.peek(i)
+		if err != nil {
+			if err == errIndexOutOfRange {
+				if len(objects) > 0 {
+					return objects, nil
+				}
+				return nil, ErrEmpty
+			}
+			return nil, err
+		}
+
+		objects = append(objects, obj)
+	}
+
+	return objects, nil
 }
 
 // Size locks things up while calculating so you are guaranteed an accurate
