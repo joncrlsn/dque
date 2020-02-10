@@ -1,5 +1,5 @@
 name: test
-on: push
+on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,7 +19,7 @@ jobs:
     - name: Build tests
       run: go test -c
     - name: Run unit tests
-      run: go test -v -cover ./...
+      run: go test -race -cover ./...
     - name: Test building on windows
       env: {GOOS: windows}
       run: go test -c
