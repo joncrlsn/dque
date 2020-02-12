@@ -25,6 +25,8 @@ import (
 
 const LOCK_FILE = "lock.lock"
 
+var ErrQueueClosed = errors.New("queue is closed")
+
 var (
 	filePattern *regexp.Regexp
 
@@ -50,7 +52,7 @@ type DQue struct {
 	config  config
 
 	fullPath     string
-	lockfile     *os.File
+	lockfile     *os.File // as long as this file is open the queue can be used
 	firstSegment *qSegment
 	lastSegment  *qSegment
 	builder      func() interface{} // builds a structure to load via gob
@@ -152,11 +154,11 @@ func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() 
 	return New(name, dirPath, itemsPerSegment, builder)
 }
 
-// Close releases the lock on the queue directory rendering it unusable for further usage.
+// Close releases the lock on the queue rendering it unusable for further usage by this instance.
 // Close will return an error if it has already been called.
 func (q *DQue) Close() error {
 	if q.lockfile == nil {
-		return errors.New("the queue directory has already been closed")
+		return ErrQueueClosed
 	}
 
 	err := syscall.Flock(int(q.lockfile.Fd()), syscall.F_UNLCK)
@@ -172,12 +174,21 @@ func (q *DQue) Close() error {
 		return err
 	}
 
+	// Finally mark this instance as closed to prevent any further access
 	q.lockfile = nil
+
+	// Safe-guard ourself from accidentally using segments after closing the queue
+	q.firstSegment = nil
+	q.lastSegment = nil
+
 	return nil
 }
 
 // Enqueue adds an item to the end of the queue
 func (q *DQue) Enqueue(obj interface{}) error {
+	if q.lockfile == nil {
+		return ErrQueueClosed
+	}
 
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
@@ -217,6 +228,9 @@ func (q *DQue) Enqueue(obj interface{}) error {
 // Dequeue removes and returns the first item in the queue.
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 func (q *DQue) Dequeue() (interface{}, error) {
+	if q.lockfile == nil {
+		return nil, ErrQueueClosed
+	}
 
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
@@ -278,6 +292,9 @@ func (q *DQue) Dequeue() (interface{}, error) {
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 // Do not use this method with multiple dequeueing threads or you may regret it.
 func (q *DQue) Peek() (interface{}, error) {
+	if q.lockfile == nil {
+		return nil, ErrQueueClosed
+	}
 
 	// This is heavy-handed but it is safe
 	q.mutex.Lock()
@@ -300,6 +317,9 @@ func (q *DQue) Peek() (interface{}, error) {
 // size... unless you have changed the itemsPerSegment value since the queue
 // was last empty.  Then it could be wildly inaccurate.
 func (q *DQue) Size() int {
+	if q.lockfile == nil {
+		return 0
+	}
 
 	// This is heavy-handed but it is safe
 	q.mutex.Lock()
@@ -316,6 +336,9 @@ func (q *DQue) Size() int {
 // Also, because this method is not synchronized, the size may change after
 // entering this method.
 func (q *DQue) SizeUnsafe() int {
+	if q.lockfile == nil {
+		return 0
+	}
 	if q.firstSegment.number == q.lastSegment.number {
 		return q.firstSegment.size()
 	}
@@ -326,6 +349,9 @@ func (q *DQue) SizeUnsafe() int {
 // SegmentNumbers returns the number of both the first last segmment.
 // There is likely no use for this information other than testing.
 func (q *DQue) SegmentNumbers() (int, int) {
+	if q.lockfile == nil {
+		return 0, 0
+	}
 	return q.firstSegment.number, q.lastSegment.number
 }
 
@@ -340,6 +366,10 @@ func (q *DQue) Turbo() bool {
 // risk of losing data if a power-loss occurs.
 // If turbo is already on an error is returned
 func (q *DQue) TurboOn() error {
+	if q.lockfile == nil {
+		return ErrQueueClosed
+	}
+
 	if q.turbo {
 		return errors.New("DQue.TurboOn() is not valid when turbo is on")
 	}
@@ -353,6 +383,10 @@ func (q *DQue) TurboOn() error {
 // they happen.
 // If turbo is already off an error is returned
 func (q *DQue) TurboOff() error {
+	if q.lockfile == nil {
+		return ErrQueueClosed
+	}
+
 	if !q.turbo {
 		return errors.New("DQue.TurboOff() is not valid when turbo is off")
 	}
@@ -369,6 +403,9 @@ func (q *DQue) TurboOff() error {
 // TurboSync allows you to fsync changes to disk, but only if turbo is on.
 // If turbo is off an error is returned
 func (q *DQue) TurboSync() error {
+	if q.lockfile == nil {
+		return ErrQueueClosed
+	}
 	if !q.turbo {
 		return errors.New("DQue.TurboSync() is inappropriate when turbo is off")
 	}

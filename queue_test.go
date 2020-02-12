@@ -379,6 +379,60 @@ func TestQueue_NewFlock(t *testing.T) {
 	}
 }
 
+func TestQueue_UseAfterClose(t *testing.T) {
+	qName := "testUseAfterClose"
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error cleaning up the queue directory:", err)
+	}
+
+	q, err := dque.New(qName, ".", 3, item2Builder)
+	if err != nil {
+		t.Fatal("Error creating dque:", err)
+	}
+	err = q.Enqueue(&item2{0})
+	if err != nil {
+		t.Fatal("Error enqueing item:", err)
+	}
+	err = q.Close()
+	if err != nil {
+		t.Fatal("Error closing dque:", err)
+	}
+
+	queueClosedError := "queue is closed"
+
+	err = q.Close()
+	assert(t, err.Error() == queueClosedError, "Expected error not found", err)
+
+	err = q.Enqueue(&item2{0})
+	assert(t, err.Error() == queueClosedError, "Expected error not found", err)
+
+	_, err = q.Dequeue()
+	assert(t, err.Error() == queueClosedError, "Expected error not found", err)
+
+	_, err = q.Peek()
+	assert(t, err.Error() == queueClosedError, "Expected error not found", err)
+
+	s := q.Size()
+	assert(t, s == 0, "Expected error")
+
+	s = q.SizeUnsafe()
+	assert(t, s == 0, "Expected error")
+
+	err = q.TurboOn()
+	assert(t, err.Error() == queueClosedError, "Expected error not found", err)
+
+	err = q.TurboOff()
+	assert(t, err.Error() == queueClosedError, "Expected error not found", err)
+
+	err = q.TurboSync()
+	assert(t, err.Error() == queueClosedError, "Expected error not found", err)
+
+	// Cleanup
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+}
+
 func newOrOpenQ(t *testing.T, qName string, turbo bool) *dque.DQue {
 	// Create a new segment with segment size of 3
 	q, err := dque.NewOrOpen(qName, ".", 3, item2Builder)
