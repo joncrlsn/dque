@@ -316,8 +316,7 @@ func TestQueue_Turbo(t *testing.T) {
 	}
 	elapsedSafe := time.Since(start)
 
-	t.Logf("Turbo time: %v  Safe time: %v", elapsedTurbo, elapsedSafe)
-	assert(t, elapsedTurbo < elapsedSafe/2, "Turbo must be faster than safe mode")
+	assert(t, elapsedTurbo < elapsedSafe/2, "Turbo time (%v) must be faster than safe mode (%v)", elapsedTurbo, elapsedSafe)
 
 	if err := os.RemoveAll(qName); err != nil {
 		t.Fatal("Error cleaning up the queue directory:", err)
