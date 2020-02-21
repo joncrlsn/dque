@@ -432,6 +432,57 @@ func TestQueue_UseAfterClose(t *testing.T) {
 	}
 }
 
+func TestQueue_BlockingBehaviour(t *testing.T) {
+	qName := "testBlocking"
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+
+	q := newQ(t, qName, false)
+
+	go func() {
+		err := q.Enqueue(&item2{0})
+		assert(t, err == nil, "Expected no error")
+	}()
+
+	x, err := q.PeekBlock()
+	assert(t, err == nil, "Expected no error")
+	assert(t, x != nil, "Item is nil")
+
+	x, err = q.DequeueBlock()
+	assert(t, err == nil, "Expected no error")
+	assert(t, x != nil, "Item is nil")
+
+	x, err = q.Dequeue()
+	assert(t, err == dque.ErrEmpty, "Expected error not found")
+
+	timeout := time.After(3 * time.Second)
+	done := make(chan bool)
+	go func() {
+		x, err = q.DequeueBlock()
+		assert(t, err == nil, "Expected no error")
+		assert(t, x != nil, "Item is nil")
+		done <- true
+	}()
+
+	go func() {
+		time.Sleep(1 * time.Second)
+		err := q.Enqueue(&item2{2})
+		assert(t, err == nil, "Expected no error")
+	}()
+
+	select {
+	case <-timeout:
+		t.Fatal("Test didn't finish in time")
+	case <-done:
+	}
+
+	// Cleanup
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+}
+
 func newOrOpenQ(t *testing.T, qName string, turbo bool) *dque.DQue {
 	// Create a new segment with segment size of 3
 	q, err := dque.NewOrOpen(qName, ".", 3, item2Builder)

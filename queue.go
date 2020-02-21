@@ -58,6 +58,10 @@ type DQue struct {
 	builder      func() interface{} // builds a structure to load via gob
 
 	mutex sync.Mutex
+
+	emptyCond      *sync.Cond
+	mutexEmptyCond sync.Mutex
+
 	turbo bool
 }
 
@@ -87,6 +91,7 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 	q.fullPath = fullPath
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
+	q.emptyCond = sync.NewCond(&q.mutexEmptyCond)
 
 	if err := q.lock(); err != nil {
 		return nil, err
@@ -121,6 +126,7 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 	q.fullPath = fullPath
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
+	q.emptyCond = sync.NewCond(&q.mutexEmptyCond)
 
 	if err := q.lock(); err != nil {
 		return nil, err
@@ -214,6 +220,9 @@ func (q *DQue) Enqueue(obj interface{}) error {
 		return errors.Wrap(err, "error adding item to the last segment")
 	}
 
+	// Wakeup any goroutine that is currently waiting for an item to be enqueued
+	q.emptyCond.Broadcast()
+
 	return nil
 }
 
@@ -303,6 +312,42 @@ func (q *DQue) Peek() (interface{}, error) {
 	}
 
 	return obj, nil
+}
+
+// DequeueBlock behaves similar to Dequeue, but is a blocking call until an item is available.
+func (q *DQue) DequeueBlock() (interface{}, error) {
+	q.mutexEmptyCond.Lock()
+	defer q.mutexEmptyCond.Unlock()
+	for {
+		obj, err := q.Dequeue()
+		if err == ErrEmpty {
+			q.emptyCond.Wait()
+			// Wait() atomically unlocks mutexEmptyCond and suspends execution of the calling goroutine.
+			// Receiving the signal does not guarantee an item is available, let's loop and check again.
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	}
+}
+
+// PeekBlock behaves similar to Peek, but is a blocking call until an item is available.
+func (q *DQue) PeekBlock() (interface{}, error) {
+	q.mutexEmptyCond.Lock()
+	defer q.mutexEmptyCond.Unlock()
+	for {
+		obj, err := q.Peek()
+		if err == ErrEmpty {
+			q.emptyCond.Wait()
+			// Wait() atomically unlocks mutexEmptyCond and suspends execution of the calling goroutine.
+			// Receiving the signal does not guarantee an item is available, let's loop and check again.
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	}
 }
 
 // Size locks things up while calculating so you are guaranteed an accurate

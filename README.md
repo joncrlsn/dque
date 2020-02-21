@@ -2,7 +2,7 @@
 # dque - a fast embedded durable queue for Go
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/joncrlsn/dque)](https://goreportcard.com/report/github.com/joncrlsn/dque)
-[![GoDoc](https://godoc.org/github.com/joncrlsn/dque?status.svg)](https://godoc.org/github.com/joncrlsn/dque) 
+[![GoDoc](https://godoc.org/github.com/joncrlsn/dque?status.svg)](https://godoc.org/github.com/joncrlsn/dque)
 
 
 dque is:
@@ -12,7 +12,7 @@ dque is:
 * embedded -- compiled into your Golang program
 * synchronized -- safe for concurrent usage
 * fast or safe, you choose -- turbo mode lets the OS decide when to write to disk
-* has a liberal license -- allows any use, commercial or personal 
+* has a liberal license -- allows any use, commercial or personal
 
 I love tools that do one thing well.  Hopefully this fits that category.
 
@@ -22,13 +22,13 @@ I am indebted to Gabor Cselle who, years ago, inspired me with an example of an 
 There are two performance modes: safe and turbo
 ##### safe mode
 * safe mode is the default
-* forces an fsync to disk every time you enqueue or dequeue an item.  
+* forces an fsync to disk every time you enqueue or dequeue an item.
 * while this is the safest way to use dque with little risk of data loss, it is also the slowest.
-##### turbo mode 
+##### turbo mode
 * can be enabled/disabled with a call to [DQue.TurboOn()](https://godoc.org/github.com/joncrlsn/dque#DQue.TurboOn) or [DQue.TurboOff()](https://godoc.org/github.com/joncrlsn/dque#DQue.TurboOff)
 * lets the OS batch up your changes to disk, which makes it a lot faster.
 * also allows you to flush changes to disk at opportune times.  See [DQue.TurboSync()](https://godoc.org/github.com/joncrlsn/dque#DQue.TurboSync)
-* comes with a risk that a power failure could lose changes.  By turning on Turbo mode you accept that risk.  
+* comes with a risk that a power failure could lose changes.  By turning on Turbo mode you accept that risk.
 * run the benchmark to see the difference on your hardware.
 
 ### implementation
@@ -40,7 +40,7 @@ There are two performance modes: safe and turbo
 * Because the encoding/gob package is used to store the struct to disk:
   * Only structs can be stored in the queue.
   * Only one type of struct can be stored in each queue.
-  * Only public fields in a struct will be stored. 
+  * Only public fields in a struct will be stored.
   * A function is required that returns a pointer to a new struct of the type stored in the queue.  This function is used when loading segments into memory from disk.  I'd love to find a way to avoid this function.
 * Queue segment implementation:
   * For nice visuals, see [Gabor Cselle's documentation here](http://www.gaborcselle.com/open_source/java/persistent_queue.html).  Note that Gabor's implementation kept the entire queue in memory as well as disk.  dque keeps only the head and tail segments in memory.
@@ -115,6 +115,11 @@ func ExampleDQue_main() {
 		if err != dque.ErrEmpty {
 			log.Fatal("Error dequeuing item ", err)
 		}
+	}
+
+	// Dequeue the next item in the queue and block until one is available
+	if iface, err = q.DequeueBlock(); err != nil {
+		log.Fatal("Error dequeuing item ", err)
 	}
 
 	// Assert type of the response to an Item pointer so we can work with it
