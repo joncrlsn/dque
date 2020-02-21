@@ -12,8 +12,8 @@ package dque
 import (
 	"strconv"
 	"sync"
-	"syscall"
 
+	"github.com/gofrs/flock"
 	"github.com/pkg/errors"
 
 	"io/ioutil"
@@ -52,7 +52,7 @@ type DQue struct {
 	config  config
 
 	fullPath     string
-	lockfile     *os.File // as long as this file is open the queue can be used
+	fileLock     *flock.Flock
 	firstSegment *qSegment
 	lastSegment  *qSegment
 	builder      func() interface{} // builds a structure to load via gob
@@ -157,25 +157,17 @@ func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() 
 // Close releases the lock on the queue rendering it unusable for further usage by this instance.
 // Close will return an error if it has already been called.
 func (q *DQue) Close() error {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
 
-	err := syscall.Flock(int(q.lockfile.Fd()), syscall.F_UNLCK)
-	if err != nil {
-		return err
-	}
-	err = q.lockfile.Close()
-	if err != nil {
-		return err
-	}
-	err = os.Remove(path.Join(q.DirPath, q.Name, LOCK_FILE))
+	err := q.fileLock.Close()
 	if err != nil {
 		return err
 	}
 
 	// Finally mark this instance as closed to prevent any further access
-	q.lockfile = nil
+	q.fileLock = nil
 
 	// Safe-guard ourself from accidentally using segments after closing the queue
 	q.firstSegment = nil
@@ -186,7 +178,7 @@ func (q *DQue) Close() error {
 
 // Enqueue adds an item to the end of the queue
 func (q *DQue) Enqueue(obj interface{}) error {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
 
@@ -228,7 +220,7 @@ func (q *DQue) Enqueue(obj interface{}) error {
 // Dequeue removes and returns the first item in the queue.
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 func (q *DQue) Dequeue() (interface{}, error) {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return nil, ErrQueueClosed
 	}
 
@@ -292,7 +284,7 @@ func (q *DQue) Dequeue() (interface{}, error) {
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 // Do not use this method with multiple dequeueing threads or you may regret it.
 func (q *DQue) Peek() (interface{}, error) {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return nil, ErrQueueClosed
 	}
 
@@ -317,7 +309,7 @@ func (q *DQue) Peek() (interface{}, error) {
 // size... unless you have changed the itemsPerSegment value since the queue
 // was last empty.  Then it could be wildly inaccurate.
 func (q *DQue) Size() int {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return 0
 	}
 
@@ -336,7 +328,7 @@ func (q *DQue) Size() int {
 // Also, because this method is not synchronized, the size may change after
 // entering this method.
 func (q *DQue) SizeUnsafe() int {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return 0
 	}
 	if q.firstSegment.number == q.lastSegment.number {
@@ -349,7 +341,7 @@ func (q *DQue) SizeUnsafe() int {
 // SegmentNumbers returns the number of both the first last segmment.
 // There is likely no use for this information other than testing.
 func (q *DQue) SegmentNumbers() (int, int) {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return 0, 0
 	}
 	return q.firstSegment.number, q.lastSegment.number
@@ -366,7 +358,7 @@ func (q *DQue) Turbo() bool {
 // risk of losing data if a power-loss occurs.
 // If turbo is already on an error is returned
 func (q *DQue) TurboOn() error {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
 
@@ -383,7 +375,7 @@ func (q *DQue) TurboOn() error {
 // they happen.
 // If turbo is already off an error is returned
 func (q *DQue) TurboOff() error {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
 
@@ -403,7 +395,7 @@ func (q *DQue) TurboOff() error {
 // TurboSync allows you to fsync changes to disk, but only if turbo is on.
 // If turbo is off an error is returned
 func (q *DQue) TurboSync() error {
-	if q.lockfile == nil {
+	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
 	if !q.turbo {
@@ -484,16 +476,16 @@ func (q *DQue) load() error {
 
 func (q *DQue) lock() error {
 	l := path.Join(q.DirPath, q.Name, LOCK_FILE)
-	f, err := os.OpenFile(l, os.O_RDONLY|os.O_CREATE, 0666)
+	fileLock := flock.New(l)
+
+	locked, err := fileLock.TryLock()
 	if err != nil {
 		return err
 	}
-
-	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-	if err != nil {
-		return err
+	if !locked {
+		return errors.New("failed to acquire flock")
 	}
 
-	q.lockfile = f
+	q.fileLock = fileLock
 	return nil
 }
