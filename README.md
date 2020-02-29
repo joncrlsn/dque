@@ -32,7 +32,8 @@ There are two performance modes: safe and turbo
 * run the benchmark to see the difference on your hardware.
 
 ### implementation
-* The queue is held in segments of a configurable size. 
+* The queue is held in segments of a configurable size.
+* The queue is protected against re-opening from other processes.
 * Each in-memory segment corresponds with a file on disk. Think of the segment files as a bit like rolling log files.  The oldest segment files are eventually deleted, not based on time, but whenever their items have all been dequeued.
 * Segment files are only appended to until they fill up. At which point a new segment is created.  They are never modified (other than being appended to and deleted when each of their items has been dequeued).
 * If there is more than one segment, new items are enqueued to the last segment while dequeued items are taken from the first segment.
@@ -93,10 +94,11 @@ func ExampleDQue_main() {
 	// Add an item to the queue
 	err := q.Enqueue(&Item{"Joe", 1})
 	...
-	
+
+	// Properly close a queue
+	q.Close()
 
 	// You can reconsitute the queue from disk at any time
-	// as long as you never use the old instance
 	q, err = dque.Open(qName, qDir, segmentSize, ItemBuilder)
 	...
 
