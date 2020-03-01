@@ -7,8 +7,9 @@ package dque_test
 
 import (
 	"fmt"
-	"github.com/joncrlsn/dque"
 	"log"
+
+	"github.com/joncrlsn/dque"
 )
 
 // Item is what we'll be storing in the queue.  It can be any struct
@@ -66,6 +67,16 @@ func ExampleDQue() {
 	}
 	log.Println("Dequeued an interface:", iface)
 	log.Println("Size should be zero:", q.Size())
+
+	go func() {
+		err := q.Enqueue(&Item{"Joe", 1})
+		log.Println("Enqueued from goroutine", err == nil)
+	}()
+
+	// Dequeue the next item in the queue and block until one is available
+	if iface, err = q.DequeueBlock(); err != nil {
+		log.Fatal("Error dequeuing item ", err)
+	}
 
 	// Assert type of the response to an Item pointer so we can work with it
 	item, ok := iface.(*Item)

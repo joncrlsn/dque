@@ -84,12 +84,12 @@ func (seg *qSegment) load() error {
 	defer seg.mutex.Unlock()
 
 	// Open the file in read mode
-	if f, err := os.OpenFile(seg.filePath(), os.O_RDONLY, 0644); err != nil {
+	f, err := os.OpenFile(seg.filePath(), os.O_RDONLY, 0644)
+	if err != nil {
 		return errors.Wrap(err, "error opening file: "+seg.filePath())
-	} else {
-		defer f.Close()
-		seg.file = f
 	}
+	defer f.Close()
+	seg.file = f
 
 	// Loop until we can load no more
 	for {

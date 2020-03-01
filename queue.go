@@ -58,6 +58,10 @@ type DQue struct {
 	builder      func() interface{} // builds a structure to load via gob
 
 	mutex sync.Mutex
+
+	emptyCond      *sync.Cond
+	mutexEmptyCond sync.Mutex
+
 	turbo bool
 }
 
@@ -87,6 +91,7 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 	q.fullPath = fullPath
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
+	q.emptyCond = sync.NewCond(&q.mutexEmptyCond)
 
 	if err := q.lock(); err != nil {
 		return nil, err
@@ -121,6 +126,7 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 	q.fullPath = fullPath
 	q.config.ItemsPerSegment = itemsPerSegment
 	q.builder = builder
+	q.emptyCond = sync.NewCond(&q.mutexEmptyCond)
 
 	if err := q.lock(); err != nil {
 		return nil, err
@@ -157,6 +163,10 @@ func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() 
 // Close releases the lock on the queue rendering it unusable for further usage by this instance.
 // Close will return an error if it has already been called.
 func (q *DQue) Close() error {
+	// only allow Close while no other function is active
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
@@ -169,6 +179,9 @@ func (q *DQue) Close() error {
 	// Finally mark this instance as closed to prevent any further access
 	q.fileLock = nil
 
+	// Wake-up any waiting goroutines for blocking queue access - they should get a ErrQueueClosed
+	q.emptyCond.Broadcast()
+
 	// Safe-guard ourself from accidentally using segments after closing the queue
 	q.firstSegment = nil
 	q.lastSegment = nil
@@ -178,13 +191,13 @@ func (q *DQue) Close() error {
 
 // Enqueue adds an item to the end of the queue
 func (q *DQue) Enqueue(obj interface{}) error {
-	if q.fileLock == nil {
-		return ErrQueueClosed
-	}
-
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+
+	if q.fileLock == nil {
+		return ErrQueueClosed
+	}
 
 	// If this segment is full then create a new one
 	if q.lastSegment.sizeOnDisk() >= q.config.ItemsPerSegment {
@@ -214,19 +227,22 @@ func (q *DQue) Enqueue(obj interface{}) error {
 		return errors.Wrap(err, "error adding item to the last segment")
 	}
 
+	// Wakeup any goroutine that is currently waiting for an item to be enqueued
+	q.emptyCond.Broadcast()
+
 	return nil
 }
 
 // Dequeue removes and returns the first item in the queue.
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 func (q *DQue) Dequeue() (interface{}, error) {
-	if q.fileLock == nil {
-		return nil, ErrQueueClosed
-	}
-
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+
+	if q.fileLock == nil {
+		return nil, ErrQueueClosed
+	}
 
 	// Remove the first object from the first segment
 	obj, err := q.firstSegment.remove()
@@ -284,13 +300,13 @@ func (q *DQue) Dequeue() (interface{}, error) {
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 // Do not use this method with multiple dequeueing threads or you may regret it.
 func (q *DQue) Peek() (interface{}, error) {
-	if q.fileLock == nil {
-		return nil, ErrQueueClosed
-	}
-
 	// This is heavy-handed but it is safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+
+	if q.fileLock == nil {
+		return nil, ErrQueueClosed
+	}
 
 	// Return the first object from the first segment
 	obj, err := q.firstSegment.peek()
@@ -303,6 +319,42 @@ func (q *DQue) Peek() (interface{}, error) {
 	}
 
 	return obj, nil
+}
+
+// DequeueBlock behaves similar to Dequeue, but is a blocking call until an item is available.
+func (q *DQue) DequeueBlock() (interface{}, error) {
+	q.mutexEmptyCond.Lock()
+	defer q.mutexEmptyCond.Unlock()
+	for {
+		obj, err := q.Dequeue()
+		if err == ErrEmpty {
+			q.emptyCond.Wait()
+			// Wait() atomically unlocks mutexEmptyCond and suspends execution of the calling goroutine.
+			// Receiving the signal does not guarantee an item is available, let's loop and check again.
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	}
+}
+
+// PeekBlock behaves similar to Peek, but is a blocking call until an item is available.
+func (q *DQue) PeekBlock() (interface{}, error) {
+	q.mutexEmptyCond.Lock()
+	defer q.mutexEmptyCond.Unlock()
+	for {
+		obj, err := q.Peek()
+		if err == ErrEmpty {
+			q.emptyCond.Wait()
+			// Wait() atomically unlocks mutexEmptyCond and suspends execution of the calling goroutine.
+			// Receiving the signal does not guarantee an item is available, let's loop and check again.
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		return obj, nil
+	}
 }
 
 // Size locks things up while calculating so you are guaranteed an accurate
@@ -358,6 +410,10 @@ func (q *DQue) Turbo() bool {
 // risk of losing data if a power-loss occurs.
 // If turbo is already on an error is returned
 func (q *DQue) TurboOn() error {
+	// This is heavy-handed but it is safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
@@ -375,6 +431,10 @@ func (q *DQue) TurboOn() error {
 // they happen.
 // If turbo is already off an error is returned
 func (q *DQue) TurboOff() error {
+	// This is heavy-handed but it is safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
@@ -395,6 +455,10 @@ func (q *DQue) TurboOff() error {
 // TurboSync allows you to fsync changes to disk, but only if turbo is on.
 // If turbo is off an error is returned
 func (q *DQue) TurboSync() error {
+	// This is heavy-handed but it is safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
