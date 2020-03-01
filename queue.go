@@ -175,6 +175,9 @@ func (q *DQue) Close() error {
 	// Finally mark this instance as closed to prevent any further access
 	q.fileLock = nil
 
+	// Wake-up any waiting goroutines for blocking queue access - they should get a ErrQueueClosed
+	q.emptyCond.Broadcast()
+
 	// Safe-guard ourself from accidentally using segments after closing the queue
 	q.firstSegment = nil
 	q.lastSegment = nil

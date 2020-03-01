@@ -3,9 +3,11 @@ package dque_test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -471,6 +473,110 @@ func TestQueue_BlockingBehaviour(t *testing.T) {
 		assert(t, err == nil, "Expected no error")
 	}()
 
+	select {
+	case <-timeout:
+		t.Fatal("Test didn't finish in time")
+	case <-done:
+	}
+
+	// Cleanup
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+}
+
+func TestQueue_BlockingWithClose(t *testing.T) {
+	qName := "testBlockingWithClose"
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+
+	q := newQ(t, qName, false)
+
+	go func() {
+		time.Sleep(1 * time.Second)
+		err := q.Close()
+		assert(t, err == nil, "Expected no error")
+	}()
+
+	timeout := time.After(3 * time.Second)
+	done := make(chan bool)
+	go func() {
+		// The queue is empty,
+		// so DequeueBlock should really block and wait,
+		// until the other goroutine calls Close,
+		// and the Close should wake-up this DequeueBlock block,
+		// and return an error because the queue is now closed.
+		_, err := q.DequeueBlock()
+		assert(t, err == dque.ErrQueueClosed, "Expected ErrQueueClosed error")
+		done <- true
+	}()
+
+	select {
+	case <-timeout:
+		t.Fatal("Test didn't finish in time")
+	case <-done:
+	}
+
+	// Cleanup
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+}
+
+func TestQueue_BlockingAggresive(t *testing.T) {
+	rand.Seed(0) // ensure we have reproducible sleeps
+
+	qName := "testBlockingAggresive"
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory:", err)
+	}
+
+	q := newQ(t, qName, false)
+
+	numProducers := 5
+	numItemsPerProducer := 50
+	numConsumers := 25
+
+	done := make(chan bool)
+	var wg sync.WaitGroup
+	wg.Add(numProducers * numItemsPerProducer)
+
+	go func() {
+		wg.Wait()
+		q.Close()
+		done <- true
+	}()
+
+	// producers
+	for p := 0; p < numProducers; p++ {
+		go func(producer int) {
+			for i := 0; i < numItemsPerProducer; i++ {
+				s := rand.Intn(150)
+				time.Sleep(time.Duration(s) * time.Millisecond)
+				err := q.Enqueue(&item2{i})
+				assert(t, err == nil, "Expected no error", err)
+				fmt.Println("Enqueued item", i, "by producer", producer, "after sleeping", s)
+			}
+		}(p)
+	}
+
+	// consumers
+	for c := 0; c < numConsumers; c++ {
+		go func(consumer int) {
+			for {
+				x, err := q.DequeueBlock()
+				if err == dque.ErrQueueClosed {
+					return
+				}
+				assert(t, err == nil, "Expected no error")
+				fmt.Println("Dequeued item", x, "by consumer", consumer)
+				wg.Done()
+			}
+		}(c)
+	}
+
+	timeout := time.After(10 * time.Second)
 	select {
 	case <-timeout:
 		t.Fatal("Test didn't finish in time")
