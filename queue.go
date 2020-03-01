@@ -163,6 +163,10 @@ func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() 
 // Close releases the lock on the queue rendering it unusable for further usage by this instance.
 // Close will return an error if it has already been called.
 func (q *DQue) Close() error {
+	// only allow Close while no other function is active
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
@@ -187,13 +191,13 @@ func (q *DQue) Close() error {
 
 // Enqueue adds an item to the end of the queue
 func (q *DQue) Enqueue(obj interface{}) error {
-	if q.fileLock == nil {
-		return ErrQueueClosed
-	}
-
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+
+	if q.fileLock == nil {
+		return ErrQueueClosed
+	}
 
 	// If this segment is full then create a new one
 	if q.lastSegment.sizeOnDisk() >= q.config.ItemsPerSegment {
@@ -232,13 +236,13 @@ func (q *DQue) Enqueue(obj interface{}) error {
 // Dequeue removes and returns the first item in the queue.
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 func (q *DQue) Dequeue() (interface{}, error) {
-	if q.fileLock == nil {
-		return nil, ErrQueueClosed
-	}
-
 	// This is heavy-handed but its safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+
+	if q.fileLock == nil {
+		return nil, ErrQueueClosed
+	}
 
 	// Remove the first object from the first segment
 	obj, err := q.firstSegment.remove()
@@ -296,13 +300,13 @@ func (q *DQue) Dequeue() (interface{}, error) {
 // When the queue is empty, nil and dque.ErrEmpty are returned.
 // Do not use this method with multiple dequeueing threads or you may regret it.
 func (q *DQue) Peek() (interface{}, error) {
-	if q.fileLock == nil {
-		return nil, ErrQueueClosed
-	}
-
 	// This is heavy-handed but it is safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+
+	if q.fileLock == nil {
+		return nil, ErrQueueClosed
+	}
 
 	// Return the first object from the first segment
 	obj, err := q.firstSegment.peek()
@@ -406,6 +410,10 @@ func (q *DQue) Turbo() bool {
 // risk of losing data if a power-loss occurs.
 // If turbo is already on an error is returned
 func (q *DQue) TurboOn() error {
+	// This is heavy-handed but it is safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
@@ -423,6 +431,10 @@ func (q *DQue) TurboOn() error {
 // they happen.
 // If turbo is already off an error is returned
 func (q *DQue) TurboOff() error {
+	// This is heavy-handed but it is safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
@@ -443,6 +455,10 @@ func (q *DQue) TurboOff() error {
 // TurboSync allows you to fsync changes to disk, but only if turbo is on.
 // If turbo is off an error is returned
 func (q *DQue) TurboSync() error {
+	// This is heavy-handed but it is safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	if q.fileLock == nil {
 		return ErrQueueClosed
 	}
