@@ -30,6 +30,7 @@ There are two performance modes: safe and turbo
 * also allows you to flush changes to disk at opportune times.  See [DQue.TurboSync()](https://godoc.org/github.com/joncrlsn/dque#DQue.TurboSync)
 * comes with a risk that a power failure could lose changes.  By turning on Turbo mode you accept that risk.
 * run the benchmark to see the difference on your hardware.
+* there is a todo item to force flush changes to disk after a configurable amount of time to limit risk.
 
 ### implementation
 * The queue is held in segments of a configurable size.
@@ -144,8 +145,3 @@ func doSomething(item *Item) {
 * add option to enable turbo with a timeout that would ensure you would never lose more than n seconds of changes.
 * add Lock() and Unlock() methods so you can peek at the first item and then conditionally dequeue it without worrying that another goroutine has grabbed it out from under you.  The use case is when you don't want to actually remove it from the queue until you know you were able to successfully handle it.
 * store the segment size in a config file inside the queue. Then it only needs to be specified on dque.New(...)
-
-### similar libraries in Go
-It is important to choose the tool that best fits your use case.
-* [curlyq](https://github.com/mcmathja/curlyq)
-* [asynq](https://github.com/hibiken/asynq)
