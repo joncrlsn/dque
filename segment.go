@@ -35,10 +35,12 @@ type ErrCorruptedSegment struct {
 	Err  error
 }
 
+// Error returns a string describing ErrCorruptedSegment
 func (e ErrCorruptedSegment) Error() string {
 	return fmt.Sprintf("segment file %s is corrupted: %s", e.Path, e.Err)
 }
 
+// Unwrap returns the wrapped error
 func (e ErrCorruptedSegment) Unwrap() error {
 	return e.Err
 }
@@ -49,10 +51,12 @@ type ErrUnableToDecode struct {
 	Err  error
 }
 
+// Error returns a string describing ErrUnableToDecode error
 func (e ErrUnableToDecode) Error() string {
 	return fmt.Sprintf("object in segment file %s cannot be decoded: %s", e.Path, e.Err)
 }
 
+// Unwrap returns the wrapped error
 func (e ErrUnableToDecode) Unwrap() error {
 	return e.Err
 }

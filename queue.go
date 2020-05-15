@@ -23,8 +23,9 @@ import (
 	"regexp"
 )
 
-const LOCK_FILE = "lock.lock"
+const lockFile = "lock.lock"
 
+// ErrQueueClosed is the error returned when a queue is closed.
 var ErrQueueClosed = errors.New("queue is closed")
 
 var (
@@ -539,7 +540,7 @@ func (q *DQue) load() error {
 }
 
 func (q *DQue) lock() error {
-	l := path.Join(q.DirPath, q.Name, LOCK_FILE)
+	l := path.Join(q.DirPath, q.Name, lockFile)
 	fileLock := flock.New(l)
 
 	locked, err := fileLock.TryLock()
