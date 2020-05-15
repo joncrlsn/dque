@@ -155,3 +155,7 @@ func doSomething(item *Item) {
 * add Lock() and Unlock() methods so you can peek at the first item and then conditionally dequeue it without worrying that another goroutine has grabbed it out from under you.  The use case is when you don't want to actually remove it from the queue until you know you were able to successfully handle it.
 * store the segment size in a config file inside the queue. Then it only needs to be specified on dque.New(...)
 
+### alternative tools
+
+* [CurlyQ](https://github.com/mcmathja/curlyq) is a bit heavier (requires Redis) but has more background processing features.
+
