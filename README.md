@@ -1,8 +1,10 @@
 
 # dque - a fast embedded durable queue for Go
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/joncrlsn/dque)](https://goreportcard.com/report/github.com/joncrlsn/dque)
-[![GoDoc](https://godoc.org/github.com/joncrlsn/dque?status.svg)](https://godoc.org/github.com/joncrlsn/dque)
+This is a fork of a [joncrlsn/dque](github.com/joncrlsn/dque) that ads Prepend functionality.
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/iseletsk/dque)](https://goreportcard.com/report/github.com/iseletsk/dque)
+[![GoDoc](https://godoc.org/github.com/iseletsk/dque?status.svg)](https://godoc.org/github.com/iseletsk/dque)
 
 dque is:
 

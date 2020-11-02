@@ -189,6 +189,36 @@ func (q *DQue) Close() error {
 	return nil
 }
 
+// Prepend adds a slice of objects to the beginning of the queue
+// The operation is expected to run very infrequently, and will lead to sub-optimal results overall
+// It also breaks Size functionality
+func (q *DQue) Prepend(objs []interface{}) error {
+	// This is heavy-handed but its safe
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	if q.fileLock == nil {
+		return ErrQueueClosed
+	}
+
+	// For the simplicity sake, we always prepend in a new segment, no matter number of objects.
+	seg, err := newQueueSegment(q.fullPath, q.firstSegment.number-1, q.turbo, q.builder)
+	if err != nil {
+		return errors.Wrapf(err, "error creating new queue segment: %d.", q.firstSegment.number-1)
+	}
+	if err := q.firstSegment.close(); err != nil {
+		return errors.Wrapf(err, "error closing first segment file #%d.", q.firstSegment.number)
+	}
+	q.firstSegment = seg
+	for _, obj := range objs {
+		if err := q.firstSegment.add(obj); err != nil {
+			return errors.Wrap(err, "error prepending item to the first segment")
+		}
+	}
+	q.emptyCond.Broadcast()
+	return nil
+}
+
 // Enqueue adds an item to the end of the queue
 func (q *DQue) Enqueue(obj interface{}) error {
 	// This is heavy-handed but its safe
