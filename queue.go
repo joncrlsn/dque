@@ -98,6 +98,10 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 	}
 
 	if err := q.load(); err != nil {
+		er := q.fileLock.Unlock()
+		if er != nil {
+			return nil, er
+		}
 		return nil, err
 	}
 
@@ -133,6 +137,10 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 	}
 
 	if err := q.load(); err != nil {
+		er := q.fileLock.Unlock()
+		if er != nil {
+			return nil, er
+		}
 		return nil, err
 	}
 
