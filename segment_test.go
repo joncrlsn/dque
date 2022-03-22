@@ -194,6 +194,55 @@ func TestSegment_Turbo(t *testing.T) {
 	}
 }
 
+type ItemByteSlice struct {
+	Item []byte
+}
+
+func itemByteSliceBuilder() interface{} {
+	return &ItemByteSlice{}
+}
+
+// TestSegment_BufferSafe make sure items aren't broken if they share some data structures
+func TestSegment_BufferSafe(t *testing.T) {
+	testDir := "./TestSegment_Open"
+	os.RemoveAll(testDir)
+	if err := os.Mkdir(testDir, 0755); err != nil {
+		t.Fatalf("Error creating directory in the TestSegment_Open method: %s\n", err)
+	}
+
+	seg, err := newQueueSegment(testDir, 10, false, itemByteSliceBuilder)
+	if err != nil {
+		t.Fatalf("newQueueSegment('%s') failed\n", testDir)
+	}
+
+	buf := make([]byte, 1024)
+
+	n := copy(buf, []byte("foobar"))
+	seg.add(&ItemByteSlice{buf[:n]})
+
+	n = copy(buf, []byte("somewords"))
+	seg.add(&ItemByteSlice{buf[:n]})
+
+	data, err := seg.remove()
+	if err != nil {
+		t.Fatalf("remove item from seg error: %s", err.Error())
+	}
+	item := string(data.(*ItemByteSlice).Item)
+	assert(t, item == "foobar", "item content not match, found: %s", item)
+
+	data, err = seg.remove()
+	if err != nil {
+		t.Fatalf("remove item from seg error: %s", err.Error())
+	}
+	item = string(data.(*ItemByteSlice).Item)
+	assert(t, item == "somewords", "item content not match, found: %s", item)
+
+	// Cleanup
+	if err := os.RemoveAll(testDir); err != nil {
+		t.Fatalf("Error cleaning up directory from the TestSegment_Open method with '%s'\n", err.Error())
+	}
+}
+
 // assert fails the test if the condition is false.
 func assert(tb testing.TB, condition bool, msg string, v ...interface{}) {
 	if !condition {
