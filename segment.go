@@ -239,7 +239,12 @@ func (seg *qSegment) add(object interface{}) error {
 		return errors.Wrapf(err, "failed to write object to segment %d", seg.number)
 	}
 
-	seg.objects = append(seg.objects, object)
+	// Rebuild object from buffer to prevent underlying data conflict
+	objectDup := seg.objectBuilder()
+	if err := gob.NewDecoder(&buff).Decode(objectDup); err != nil {
+		return errors.Wrap(err, "error gob decode object")
+	}
+	seg.objects = append(seg.objects, objectDup)
 
 	// Possibly force writes to disk
 	return seg._sync()
