@@ -1,6 +1,4 @@
-//
 // Package dque is a fast embedded durable queue for Go
-//
 package dque
 
 //
@@ -10,17 +8,16 @@ package dque
 //
 
 import (
-	"strconv"
-	"sync"
-
-	"github.com/gofrs/flock"
-	"github.com/pkg/errors"
-
 	"io/ioutil"
 	"math"
 	"os"
 	"path"
 	"regexp"
+	"strconv"
+	"sync"
+
+	"github.com/gofrs/flock"
+	"github.com/pkg/errors"
 )
 
 const lockFile = "lock.lock"
@@ -67,7 +64,6 @@ type DQue struct {
 
 // New creates a new durable queue
 func New(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*DQue, error) {
-
 	// Validation
 	if len(name) == 0 {
 		return nil, errors.New("the queue name requires a value")
@@ -83,7 +79,7 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 		return nil, errors.New("the given queue directory already exists: " + fullPath + ". Use Open instead")
 	}
 
-	if err := os.Mkdir(fullPath, 0755); err != nil {
+	if err := os.Mkdir(fullPath, 0o755); err != nil {
 		return nil, errors.Wrap(err, "error creating queue directory "+fullPath)
 	}
 
@@ -110,7 +106,6 @@ func New(name string, dirPath string, itemsPerSegment int, builder func() interf
 
 // Open opens an existing durable queue.
 func Open(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*DQue, error) {
-
 	// Validation
 	if len(name) == 0 {
 		return nil, errors.New("the queue name requires a value")
@@ -149,7 +144,6 @@ func Open(name string, dirPath string, itemsPerSegment int, builder func() inter
 
 // NewOrOpen either creates a new queue or opens an existing durable queue.
 func NewOrOpen(name string, dirPath string, itemsPerSegment int, builder func() interface{}) (*DQue, error) {
-
 	// Validation
 	if len(name) == 0 {
 		return nil, errors.New("the queue name requires a value")
@@ -219,7 +213,7 @@ func (q *DQue) Enqueue(obj interface{}) error {
 		// If the last segment is not the first segment
 		// then we need to close the file.
 		if q.firstSegment != q.lastSegment {
-			var err = q.lastSegment.close()
+			err := q.lastSegment.close()
 			if err != nil {
 				return errors.Wrapf(err, "error closing previous segment file #%d.", q.lastSegment.number)
 			}
@@ -288,7 +282,6 @@ func (q *DQue) dequeueLocked() (interface{}, error) {
 			q.lastSegment = seg
 
 		} else {
-
 			if q.firstSegment.number+1 == q.lastSegment.number {
 				// We have 2 segments, moving down to 1 shared segment
 				q.firstSegment = q.lastSegment
@@ -301,7 +294,6 @@ func (q *DQue) dequeueLocked() (interface{}, error) {
 				}
 				q.firstSegment = seg
 			}
-
 		}
 	}
 
@@ -377,13 +369,13 @@ func (q *DQue) PeekBlock() (interface{}, error) {
 // size... unless you have changed the itemsPerSegment value since the queue
 // was last empty.  Then it could be wildly inaccurate.
 func (q *DQue) Size() int {
-	if q.fileLock == nil {
-		return 0
-	}
-
 	// This is heavy-handed but it is safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+
+	if q.fileLock == nil {
+		return 0
+	}
 
 	return q.SizeUnsafe()
 }
@@ -492,7 +484,6 @@ func (q *DQue) TurboSync() error {
 
 // load populates the queue from disk
 func (q *DQue) load() error {
-
 	// Find all queue files
 	files, err := ioutil.ReadDir(q.fullPath)
 	if err != nil {
