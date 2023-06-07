@@ -377,10 +377,6 @@ func (q *DQue) PeekBlock() (interface{}, error) {
 // size... unless you have changed the itemsPerSegment value since the queue
 // was last empty.  Then it could be wildly inaccurate.
 func (q *DQue) Size() int {
-	if q.fileLock == nil {
-		return 0
-	}
-
 	// This is heavy-handed but it is safe
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
