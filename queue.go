@@ -381,9 +381,6 @@ func (q *DQue) Size() int {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
-	if q.fileLock == nil {
-		return 0
-	}
 	return q.SizeUnsafe()
 }
 
