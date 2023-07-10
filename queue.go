@@ -191,6 +191,10 @@ func (q *DQue) Close() error {
 	q.emptyCond.Broadcast()
 
 	// Safe-guard ourself from accidentally using segments after closing the queue
+
+	q.firstSegment.file.Close()
+	q.lastSegment.file.Close()
+
 	q.firstSegment = nil
 	q.lastSegment = nil
 
