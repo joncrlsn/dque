@@ -25,6 +25,69 @@ func item2Builder() interface{} {
 	return &item2{}
 }
 
+func itemsGen(from, to int) []interface{} {
+	result := make([]interface{}, to-from)
+	for i := 0; i < to-from; i++ {
+		result[i] = &item2{from + i}
+	}
+	return result
+}
+
+// Test prepend at various stages of execution
+func TestQueue_PrependLoop(t *testing.T) {
+	testQueue_PrependLoop(t, true /* true=turbo */)
+	testQueue_PrependLoop(t, false /* true=turbo */)
+}
+
+func testQueue_PrependLoop(t *testing.T, turbo bool) {
+	qName := "test1"
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error removing queue directory", err)
+	}
+
+	// Create a new queue with segment size of 3
+	q := newQ(t, qName, turbo)
+
+	for i := 0; i < 4; i++ {
+		if err := q.Enqueue(&item2{i}); err != nil {
+			t.Fatal("Error enqueueing", err)
+		}
+	}
+	if err := q.Prepend(itemsGen(4, 10)); err != nil {
+		t.Fatal("Error prepending", err)
+	}
+	checkQueue(t, q, []int{4, 5, 6, 7, 8, 9, 0, 1})
+	if err := q.Prepend(itemsGen(10, 15)); err != nil {
+		t.Fatal("Error prepending", err)
+	}
+	checkQueue(t, q, []int{10, 11, 12, 13})
+	for i := 15; i < 20; i++ {
+		if err := q.Enqueue(&item2{i}); err != nil {
+			t.Fatal("Error enqueueing", err)
+		}
+	}
+	checkQueue(t, q, []int{14, 2, 3, 15, 16, 17, 18, 19})
+	if err := os.RemoveAll(qName); err != nil {
+		t.Fatal("Error cleaning up the queue directory", err)
+	}
+}
+
+func checkQueue(t *testing.T, q *dque.DQue, values []int) {
+	for _, i := range values {
+		obj, err := q.Dequeue()
+		if err != nil {
+			t.Fatal("Unable to get element", err)
+		}
+		i2, ok := obj.(*item2)
+		if !ok {
+			t.Fatalf("Invalid object type %v", obj)
+		}
+		if i2.Id != i {
+			t.Fatalf("Got wrong element (should be %d): %v", i, i2)
+		}
+	}
+}
+
 // Adds 1 and removes 1 in a loop to ensure that when we've filled
 // up the first segment that we delete it and move on to the next segment
 func TestQueue_AddRemoveLoop(t *testing.T) {
