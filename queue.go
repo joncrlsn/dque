@@ -190,6 +190,16 @@ func (q *DQue) Close() error {
 	// Wake-up any waiting goroutines for blocking queue access - they should get a ErrQueueClosed
 	q.emptyCond.Broadcast()
 
+	// Close the first and last segments' file handles
+	if err = q.firstSegment.close(); err != nil {
+		return err
+	}
+	if q.firstSegment != q.lastSegment {
+		if err = q.lastSegment.close(); err != nil {
+			return err
+		}
+	}
+
 	// Safe-guard ourself from accidentally using segments after closing the queue
 	q.firstSegment = nil
 	q.lastSegment = nil
@@ -530,8 +540,9 @@ func (q *DQue) load() error {
 				q.firstSegment = seg
 				break
 			}
+			// Delete the segment as it's empty and complete
+			seg.delete()
 			// Try the next one
-			seg.close()
 			minNum++
 		}
 
